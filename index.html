@@ -112,13 +112,12 @@ const g=/Grub/.test(t);
 const h=/Socket/.test(t)?`<rect x="2" y="14" width="16" height="32" rx="2"/><rect x="6" y="24" width="8" height="12" fill="${b}"/>`:/Button|Pan/.test(t)?'<rect x="2" y="12" width="16" height="36" rx="8"/>':/Counter/.test(t)?'<polygon points="2,16 18,26 18,34 2,44"/>':g?"":'<rect x="2" y="14" width="16" height="32" rx="2"/>';
 return `<svg viewBox="0 0 60 60" fill="${f}">${h}<rect x="${g?4:18}" y="25" width="${g?52:40}" height="10"/></svg>`}
 function bar(){
-const av=F.c.length?F.c:Object.keys(CATS);
-const types=av.flatMap(c=>CATS[c]);
-F.t=F.t.filter(t=>types.includes(t));
-const hasL=av.some(c=>c=="bolt"||c=="screw");
-if(!hasL)F.l=[];
-const row=(k,lab,vals,f)=>`<div class="fr"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`;
-$("bar").innerHTML=row("c","Category",Object.keys(CATS),v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("s","Size",SZ,v=>"M"+v)+(hasL?row("l","Length",LN,v=>v+" mm"):"")+'<button class="clr" data-k="clr">Clear filters</button>';
+const matches=(i,skip)=>["c","t","s","l"].every(k=>k===skip||!F[k].length||F[k].includes(({c:i.c,t:i.t,s:i.d,l:i.l})[k]));
+const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)));
+const cats=available("c"),types=available("t"),sizes=available("s"),lengths=available("l");
+F.c=F.c.filter(v=>cats.includes(v));F.t=F.t.filter(v=>types.includes(v));F.s=F.s.filter(v=>sizes.includes(v));F.l=F.l.filter(v=>lengths.includes(v));
+const row=(k,lab,vals,f)=>vals.length?`<div class="fr"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
+$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
 }
 function grid(){
 const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.s,i.d)&&has(F.l,i.l));
