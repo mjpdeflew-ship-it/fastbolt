@@ -23,13 +23,18 @@ button{font:inherit;cursor:pointer;border:0;border-radius:8px}
 .hero p{color:var(--mut);margin:0 0 14px;max-width:520px}
 .perks{display:flex;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--mut)}
 .perks span{border:1px solid var(--line);border-radius:99px;padding:3px 12px}
-.bar{display:flex;flex-direction:column;gap:8px;margin:14px 0;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px}
-.fr{display:flex;gap:8px;align-items:flex-start}
-.fr label{font-size:13px;font-weight:600;color:var(--mut);min-width:62px;padding-top:6px}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:4px 11px;font-size:14px}
-.chip.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
-.clr{background:none;color:var(--mut);text-decoration:underline;align-self:flex-start;padding:0;font-size:14px}
+.bar{display:flex;flex-direction:column;gap:15px;margin:16px 0;padding:18px 20px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 28px rgba(29,34,41,.045)}
+.fr{display:grid;grid-template-columns:84px minmax(0,1fr);gap:14px;align-items:center}
+.fr label{font-size:11px;font-weight:750;letter-spacing:.075em;text-transform:uppercase;color:var(--mut);min-width:0;padding:0}
+.chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-height:36px;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:7px 13px;font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
+.chip:hover:not(.on){background:var(--bg);border-color:var(--acc)}
+.chip:active{transform:scale(.98)}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink);box-shadow:inset 0 -2px 0 var(--acc)}
+.chip:focus-visible,.clr:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
+.clr{display:inline-flex;align-items:center;align-self:flex-start;background:var(--bg);color:var(--mut);border:1px solid var(--line);border-radius:8px;text-decoration:none;padding:7px 11px;font-size:12px;font-weight:650;transition:color .15s ease,border-color .15s ease}
+.clr:hover{color:var(--acc);border-color:var(--acc)}
+@media(max-width:560px){.bar{gap:14px;padding:15px 13px;border-radius:13px}.fr{grid-template-columns:1fr;gap:7px}.fr label{font-size:10px}.chips{gap:7px}.chip{min-height:35px;padding:7px 11px;font-size:12px}}
 .cnt{color:var(--mut);font-size:14px;margin-bottom:8px}
 input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);min-width:0}
 .list{display:flex;flex-direction:column;gap:8px;padding-bottom:16px}
@@ -116,7 +121,7 @@ const matches=(i,skip)=>["c","t","s","l"].every(k=>k===skip||!F[k].length||F[k].
 const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)));
 const cats=[...new Set(ITEMS.map(i=>i.c))].sort((a,b)=>a.localeCompare(b)),types=available("t"),sizes=available("s"),lengths=available("l");
 F.c=F.c.filter(v=>cats.includes(v));F.t=F.t.filter(v=>types.includes(v));F.s=F.s.filter(v=>sizes.includes(v));F.l=F.l.filter(v=>lengths.includes(v));
-const row=(k,lab,vals,f)=>vals.length?`<div class="fr"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
+const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
 $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
 }
 function grid(){
