@@ -49,6 +49,43 @@ USING (
   OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
 );
 
+-- Storefront content/contact details editable from the admin dashboard.
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id = true),
+  store_name text NOT NULL DEFAULT 'BoltHouse',
+  hero_title text NOT NULL DEFAULT 'Bolts, screws, nuts & washers.',
+  hero_description text NOT NULL DEFAULT 'Metric M3 to M20. Buy a single piece or hundreds — you choose the quantity.',
+  perk_one text NOT NULL DEFAULT 'Sold per piece',
+  perk_two text NOT NULL DEFAULT 'M3 – M20',
+  perk_three text NOT NULL DEFAULT 'Bulk quotes available',
+  whatsapp text NOT NULL DEFAULT '201552155041',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.site_settings TO anon, authenticated;
+GRANT UPDATE (store_name, hero_title, hero_description, perk_one, perk_two, perk_three, whatsapp, updated_at) ON public.site_settings TO authenticated;
+
+INSERT INTO public.site_settings (id) VALUES (true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "BoltHouse public settings read" ON public.site_settings;
+CREATE POLICY "BoltHouse public settings read"
+ON public.site_settings FOR SELECT TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS "BoltHouse admins can update settings" ON public.site_settings;
+CREATE POLICY "BoltHouse admins can update settings"
+ON public.site_settings FOR UPDATE TO authenticated
+USING (
+  (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+  OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
+)
+WITH CHECK (
+  (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+  OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
+);
+
 -- Add order workflow status while keeping existing orders.
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'new';
