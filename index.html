@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Shop metric bolts, screws, nuts and washers by type, size, length and material. Individual pieces and bulk quantities, priced in EGP.">
+<meta name="theme-color" content="#f6f5f2">
 <title>BoltHouse — Bolts, Screws, Nuts & Washers</title>
 <style>
 :root{--bg:#f6f5f2;--card:#fff;--ink:#1d2229;--mut:#5d6672;--line:#e1ded7;--acc:#d9480f;--on:#fff;--ok:#2b8a3e;
@@ -11,6 +13,14 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:en
 :root[data-theme="dark"]{--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
+.skip-link{position:absolute;left:12px;top:-60px;z-index:30;padding:9px 13px;background:var(--ink);color:var(--bg);border-radius:8px;font-weight:700}
+.skip-link:focus{top:12px}
+.catalog-search{display:grid;grid-template-columns:84px minmax(0,1fr);gap:14px;align-items:center;padding-bottom:14px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.catalog-search label{font-size:11px;font-weight:750;letter-spacing:.075em;text-transform:uppercase;color:var(--mut)}
+.catalog-search input{width:100%;min-height:40px;padding:9px 12px}
+.catalog-search input:focus-visible,.qi:focus-visible,.f input:focus-visible{outline:3px solid color-mix(in srgb,var(--acc) 55%,transparent);outline-offset:2px}
+.f label{font-size:13px;font-weight:650}
+@media(max-width:560px){.catalog-search{grid-template-columns:1fr;gap:7px}}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .w{max-width:1000px;margin:0 auto;padding:0 16px}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
@@ -70,8 +80,9 @@ footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-siz
 </style>
 </head>
 <body>
+<a class="skip-link" href="#catalog">Skip to catalogue</a>
 <header><div class="w"><div class="logo"><span id="store-name-first">Bolt</span><b id="store-name-last">House</b> 🔩</div><button class="cartbtn" id="cb">Cart (<span id="cn">0</span>)</button></div></header>
-<main class="w">
+<main class="w" id="catalog">
 <section class="hero">
 <h1 id="store-hero-title">Bolts, screws, nuts &amp; washers.</h1>
 <p id="store-hero-description">Metric M3 to M20. Buy a single piece or hundreds — you choose the quantity.</p>
@@ -82,10 +93,10 @@ footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-siz
 <div class="list" id="grid"></div>
 <button class="more" id="more" data-k="more">Show more</button>
 </main>
-<footer><div class="w">© <span id="footer-store-name">BoltHouse</span> · <a href="./admin.html" id="adm" style="color:inherit">Admin</a></div></footer>
+<footer><div class="w">© <span id="footer-store-name">BoltHouse</span> · Metric fasteners, priced in EGP</div></footer>
 <div class="ov" id="ov"><div class="drawer" id="dr"></div></div>
 
-<script src="config.js?v=5f34b5d"></script>
+<script src="config.js?v=20261015-1"></script>
 <script type="module">
 import {CFG,api,fetchAll} from "./api.js";
 let LOADERR=0,ROWS=[],CATS={},SZ=[],LN=[],ITEMS=[],byId={};
@@ -93,7 +104,9 @@ function build(rows){
 ROWS=rows;CATS={};ROWS.forEach(r=>{const a=CATS[r[0]]=CATS[r[0]]||[];if(!a.includes(r[1]))a.push(r[1])});
 SZ=[...new Set(ROWS.map(r=>r[2]))].sort((a,b)=>a-b);
 LN=[...new Set(ROWS.map(r=>r[3]).filter(Boolean))].sort((a,b)=>a-b);
-ITEMS=ROWS.map(r=>{const material=r[5]==="stainless_steel"?"stainless_steel":"steel";const base=(r[1]+"_"+r[2]+"_"+r[3]).replace(/\W/g,"_");return {id:base+(material==="steel"?"":"_"+material),c:r[0],t:r[1],d:r[2],l:r[3],p:r[4],m:material}});
+ITEMS=ROWS.map((r,index)=>{const material=r[5]==="stainless_steel"?"stainless_steel":"steel";const base=(r[1]+"_"+r[2]+"_"+r[3]).replace(/\W/g,"_");return {id:base,base,index,c:r[0],t:r[1],d:r[2],l:r[3],p:r[4],m:material}});
+const baseCounts=ITEMS.reduce((a,i)=>(a[i.base]=(a[i.base]||0)+1,a),{});
+ITEMS=ITEMS.map(i=>({...i,id:(baseCounts[i.base]>1?(i.c+"_"+i.base+"_"+i.index):i.base)+(i.m==="steel"?"":"_"+i.m)}));
 byId=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
 }
 async function loadCatalog(){
@@ -131,7 +144,7 @@ perks.replaceChildren();
 document.title=name+" — Bolts, Screws, Nuts & Washers";
 }catch(e){/* Use built-in storefront defaults if settings are not configured yet. */}
 }
-let cart={},F={c:[],t:[],m:[],s:[],l:[]},shown=30;
+let cart={},F={c:[],t:[],m:[],s:[],l:[]},shown=30,searchTerm="";
 try{cart=JSON.parse(localStorage.getItem("bh-cart2")||"{}")}catch(e){cart={}}
 // localStorage is user-controlled: retain only known products and positive integer quantities.
 if(!cart || typeof cart!=="object" || Array.isArray(cart))cart={};
@@ -139,7 +152,7 @@ for(const [k,n] of Object.entries(cart)){
   if(!byId[k] || !Number.isSafeInteger(n) || n<1)delete cart[k];
 }
 const save=()=>{try{localStorage.setItem("bh-cart2",JSON.stringify(cart))}catch(e){}};
-const count=()=>Object.keys(cart).length;
+const count=()=>Object.values(cart).reduce((sum,n)=>sum+n,0);
 const total=()=>Object.entries(cart).reduce((a,[id,n])=>a+byId[id].p*n,0);
 const has=(a,v)=>!a.length||a.includes(v);
 function ic(i){
@@ -179,7 +192,8 @@ F.m=F.m.filter(v=>materials.includes(v));
 F.s=F.s.filter(v=>sizes.includes(v));
 F.l=F.l.filter(v=>lengths.includes(v));
 const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips"><button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
-$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+
+$("bar").innerHTML='<div class="catalog-search"><label for="product-search">Search</label><input type="search" id="product-search" value="'+esc(searchTerm)+'" maxlength="100" placeholder="Search bolts, screws, sizes, lengths…" aria-label="Search the product catalogue"></div>'+
+  row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+
  row("m","Material",materials,v=>v==="stainless_steel"?"Stainless steel":"Steel")+
  row("t","Type",types)+
  row("s","Size",sizes,v=>"M"+v)+
@@ -187,8 +201,9 @@ $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")
  '<button class="clr" data-k="clr">Clear filters</button>';
 }
 function grid(){
-const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l));
-$("cnt").textContent=L.length+" items";
+const query=searchTerm.trim().toLocaleLowerCase();
+const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l)&&(!query||[i.c,i.t,i.d,i.l,i.m==="stainless_steel"?"stainless steel":"steel"].some(v=>String(v??"").toLocaleLowerCase().includes(query))));
+$("cnt").textContent=L.length+(L.length===1?" item":" items");
 $("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">${i.m==="stainless_steel"?"Stainless steel":"Steel"} · Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(getWhatsapp().replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
 $("more").style.display=L.length>shown?"block":"none";
 }
@@ -196,7 +211,7 @@ function drawer(view){
 $("cn").textContent=count();
 let h='<button class="x" data-c="close">×</button>';
 if(view=="co"){
-h+=`<h2>Checkout</h2><div class="f"><input id="nm" placeholder="Full name"><input id="ph" placeholder="Phone"><input id="ad" placeholder="Delivery address"></div><div class="tot"><span>Total</span><span>${fm(total())}</span></div><p id="er" style="color:var(--acc);margin:0"></p><button class="go" data-c="place">Place order</button>`;
+h+=`<h2>Checkout</h2><div class="f"><label for="nm">Full name</label><input id="nm" name="name" autocomplete="name" maxlength="100" required placeholder="Full name"><label for="ph">Phone number</label><input id="ph" name="tel" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" required placeholder="e.g. 01xxxxxxxxx"><label for="ad">Delivery address</label><input id="ad" name="address" autocomplete="street-address" maxlength="250" required placeholder="Street, area, city"></div><div class="tot"><span>Total</span><span>${fm(total())}</span></div><p id="er" role="alert" aria-live="polite" style="color:var(--acc);margin:0"></p><button class="go" data-c="place">Place order</button>`;
 }else if(view=="done"){
 const wa=getWhatsapp()&&LAST?`<a class="go" style="display:block;text-align:center;text-decoration:none;border-radius:8px;margin-bottom:8px" target="_blank" rel="noopener" href="https://wa.me/${getWhatsapp().replace(/\D/g,"")}?text=${encodeURIComponent(waText(LAST))}">Send order on WhatsApp</a>`:"";
 h+=`<h2 class="ok">Order ${ORDER_SAVED?"received":"ready"} ✓</h2><p>${ORDER_SAVED?"Thanks! We'll contact you to confirm delivery.":"Your order has not been submitted yet. Tap below to send it to us on WhatsApp."}</p>${wa}<button class="go" data-c="close">Keep shopping</button>`;
@@ -212,7 +227,7 @@ const b=e.target.closest("button");
 if(e.target.id=="ov")$("ov").classList.remove("open");
 if(!b)return;
 const d=b.dataset;
-if(d.k=="clr"){F={c:[],t:[],m:[],s:[],l:[]};shown=30;bar();grid()}
+if(d.k=="clr"){F={c:[],t:[],m:[],s:[],l:[]};searchTerm="";shown=30;bar();grid()}
 else if(d.k=="more"){shown+=30;grid()}
 else if(d.k){if(d.v=="*")F[d.k]=[];else{const v=(d.k=="s"||d.k=="l")?+d.v:d.v,a=F[d.k],i=a.indexOf(v);if(d.k=="l")i<0?a.push(v):a.splice(i,1);else F[d.k]=i<0?[v]:[]}shown=30;bar();grid()}
 if(d.a && byId[d.a]){const n=Math.max(1,Math.min(100000,parseInt($("q"+d.a)?.value,10)||1));cart[d.a]=Math.min(100000,(cart[d.a]||0)+n);save();$("cn").textContent=count();b.textContent="Added ✓";setTimeout(()=>b.textContent="Add",900)}
@@ -221,6 +236,12 @@ if(d.m){if(--cart[d.m]<=0)delete cart[d.m];save();drawer()}
 if(d.c=="close")$("ov").classList.remove("open");
 if(d.c=="co")drawer("co");
 if(d.c=="place")placeOrder(b);
+});
+document.addEventListener("input",e=>{
+ if(e.target.id==="product-search"){searchTerm=e.target.value;shown=30;grid()}
+});
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&$("ov").classList.contains("open"))$("ov").classList.remove("open");
 });
 document.addEventListener("change",e=>{
 const id=e.target.dataset.qi;if(!id)return;
@@ -235,7 +256,13 @@ async function placeOrder(b){
 if(!Object.keys(cart).length){$("er").textContent="Your cart is empty.";return}
 const o={id:"BH"+Date.now().toString(36).toUpperCase(),date:new Date().toISOString(),name:$("nm").value.trim(),phone:$("ph").value.trim(),address:$("ad").value.trim(),total:total(),items:Object.entries(cart).filter(([id,n])=>byId[id] && Number.isSafeInteger(n) && n>0).map(([id,n])=>({name:lab(byId[id]),qty:n,price:byId[id].p}))};
 if(!o.items.length){$("er").textContent="Your cart is empty. Please add an item first.";return}
-if(!o.name||!o.phone||!o.address){$("nm").focus();return}
+if(!o.name){$("er").textContent="Please enter your full name.";$("nm").focus();return}
+ if(o.name.length>100){$("er").textContent="Please keep your name under 100 characters.";$("nm").focus();return}
+ if(!o.phone){$("er").textContent="Please enter your phone number.";$("ph").focus();return}
+ const phoneDigits=o.phone.replace(/\D/g,"");
+ if(phoneDigits.length<7||phoneDigits.length>15){$("er").textContent="Enter a valid phone number, including your country code if needed.";$("ph").focus();return}
+ if(!o.address){$("er").textContent="Please enter your delivery address.";$("ad").focus();return}
+ if(o.address.length>250){$("er").textContent="Please keep your address under 250 characters.";$("ad").focus();return}
 if(!CFG.SUPABASE_URL&&!getWhatsapp()){$("er").textContent="Ordering is not set up yet.";return}
 b.disabled=true;b.textContent="Sending…";
 ORDER_SAVED=false;
@@ -243,7 +270,6 @@ if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o
 LAST=o;cart={};save();drawer("done");
 }
 window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],m:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
-$("adm").href="./admin.html";
 $("cb").onclick=()=>open();
 if(CFG.SUPABASE_URL)await loadStoreSettings();
 bar();grid();$("cn").textContent=count();
