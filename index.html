@@ -181,7 +181,7 @@ const wa=getWhatsapp()&&LAST?`<a class="go" style="display:block;text-align:cent
 h+=`<h2 class="ok">Order ${ORDER_SAVED?"received":"ready"} ✓</h2><p>${ORDER_SAVED?"Thanks! We'll contact you to confirm delivery.":"Your order has not been submitted yet. Tap below to send it to us on WhatsApp."}</p>${wa}<button class="go" data-c="close">Keep shopping</button>`;
 }else{
 const e=Object.entries(cart);
-h+=`<h2>Your cart</h2>`+(e.length?e.map(([id,n])=>{const i=byId[id];return `<div class="line"><div><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">${fm(i.p)} per piece</div><div class="qty"><button data-m="${esc(id)}" aria-label="Decrease quantity">−</button><input type="number" min="1" step="1" value="${n}" data-qi="${esc(id)}" aria-label="Quantity"><button data-pl="${esc(id)}" aria-label="Increase quantity">+</button></div></div><b>${fm(i.p*n)}</b></div>`}).join("")+`<div class="tot"><span>Total</span><span>${fm(total())}</span></div><button class="go" data-c="co">Checkout</button>`:'<p class="empty">Your cart is empty.</p>');
+h+=`<h2>Your cart</h2>`+(e.length?e.map(([id,n])=>{const i=byId[id];return `<div class="line"><div><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">${i.m==="stainless_steel"?"Stainless steel":"Steel"} · ${fm(i.p)} per piece</div><div class="qty"><button data-m="${esc(id)}" aria-label="Decrease quantity">−</button><input type="number" min="1" step="1" value="${n}" data-qi="${esc(id)}" aria-label="Quantity"><button data-pl="${esc(id)}" aria-label="Increase quantity">+</button></div></div><b>${fm(i.p*n)}</b></div>`}).join("")+`<div class="tot"><span>Total</span><span>${fm(total())}</span></div><button class="go" data-c="co">Checkout</button>`:'<p class="empty">Your cart is empty.</p>');
 }
 $("dr").innerHTML=h;
 }
@@ -207,7 +207,7 @@ const n=parseInt(e.target.value,10)||0;
 if(!byId[id] || n<1)delete cart[id];else cart[id]=Math.min(100000,n);
 save();drawer();
 });
-const lab=i=>`${i.t} M${i.d}${i.l?"×"+i.l:""}`;
+const lab=i=>`${i.m==="stainless_steel"?"Stainless steel":"Steel"} ${i.t} M${i.d}${i.l?"×"+i.l:""}`;
 const waText=o=>`Order ${o.id}\n`+o.items.map(i=>`${i.qty} × ${i.name} = ${fm(i.qty*i.price)}`).join("\n")+`\nTotal: ${fm(o.total)}\nName: ${o.name}\nPhone: ${o.phone}\nAddress: ${o.address}`;
 let LAST=null,ORDER_SAVED=false;
 async function placeOrder(b){
