@@ -25,7 +25,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .small{font-size:12px}
 .field{display:flex;flex-direction:column;gap:6px;margin:12px 0}
 .field label{font-size:12px;font-weight:750;color:var(--mut)}
-.field input,.field select,.toolbar input,.toolbar select{min-width:0;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+.field input,.field select,.field textarea,.toolbar input,.toolbar select{min-width:0;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+.field textarea{resize:vertical;min-height:100px;line-height:1.5}
 .btn{border:1px solid transparent;border-radius:9px;padding:10px 14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;white-space:nowrap}
 .btn-primary{background:var(--acc);color:#fff}
 .btn-primary:hover{filter:brightness(.96)}
@@ -143,7 +144,7 @@ const money = value => Number(value || 0).toLocaleString("en-US",{minimumFractio
 const pretty = value => String(value || "").replace(/^./, ch => ch.toUpperCase());
 const dateText = value => value ? new Date(value).toLocaleString() : "Date unavailable";
 const statuses = ["new","confirmed","processing","completed","cancelled"];
-const state = { route:"overview", auth:null, products:[], orders:[], visibleOrders:[], productSearch:"", productCategory:"all", orderSearch:"", orderStatus:"all", ordersStatusSupported:true, productError:"", ordersError:"", editing:null, toastTimer:null };
+const state = { route:"overview", auth:null, products:[], orders:[], settings:null, visibleOrders:[], productSearch:"", productCategory:"all", orderSearch:"", orderStatus:"all", ordersStatusSupported:true, productError:"", ordersError:"", settingsError:"", editing:null, toastTimer:null };
 
 function isAdmin(auth) {
   const meta = auth && auth.user && auth.user.app_metadata ? auth.user.app_metadata : {};
@@ -174,7 +175,7 @@ function renderDenied() {
 }
 function renderShell() {
   const email = state.auth && state.auth.user && state.auth.user.email ? state.auth.user.email : "Administrator";
-  const nav = [{id:"overview",icon:"▦",label:"Overview"},{id:"products",icon:"◇",label:"Products"},{id:"orders",icon:"▤",label:"Orders"}];
+  const nav = [{id:"overview",icon:"▦",label:"Overview"},{id:"products",icon:"◇",label:"Products"},{id:"orders",icon:"▤",label:"Orders"},{id:"settings",icon:"⚙",label:"Store settings"}];
   $("root").innerHTML = '<div class="admin-layout"><aside class="sidebar"><a class="brand" href="./index.html"><span class="brand-mark">🔩</span><span>Bolt<b>House</b></span></a><div class="side-nav-wrap"><div><div class="nav-label">WORKSPACE</div><nav class="nav">' +
     nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '"><span class="nav-icon">' + item.icon + '</span><span>' + item.label + '</span></button>').join("") +
     '</nav></div></div><div class="side-bottom"><div class="side-email">Signed in as<br><strong>' + esc(email) + '</strong></div><button class="btn btn-soft btn-block" data-action="logout">↪ Sign out</button><p class="small muted"><a href="./admin-policies.sql" target="_blank" rel="noopener">Admin database setup</a></p></div></aside>' +
@@ -238,9 +239,9 @@ async function loadOrdersData() {
   }
 }
 async function navigate(route) {
-  if (!["overview","products","orders"].includes(route)) route = "overview";
+  if (!["overview","products","orders","settings"].includes(route)) route = "overview";
   state.route = route;
-  setPageTitle(route === "overview" ? "Overview" : pretty(route));
+  setPageTitle(route === "overview" ? "Overview" : route === "settings" ? "Store settings" : pretty(route));
   const page = $("page");
   if (!page) return;
   page.innerHTML = '<div class="panel-empty">Loading ' + esc(route) + '…</div>';
@@ -250,9 +251,88 @@ async function navigate(route) {
   } else if (route === "products") {
     await loadProductsData();
     renderProducts();
-  } else {
+  } else if (route === "orders") {
     await loadOrdersData();
     renderOrders();
+  } else {
+    await loadSettingsData();
+    renderSettings();
+  }
+}
+async function loadSettingsData() {
+  state.settingsError = "";
+  try {
+    const rows = await api("site_settings?select=id,store_name,hero_title,hero_description,perk_one,perk_two,perk_three,whatsapp,updated_at&id=eq.true",{method:"GET"});
+    if (!Array.isArray(rows) || !rows.length) throw new Error("No store settings were found. Run the admin database setup SQL to create the settings record.");
+    state.settings = rows[0];
+    return true;
+  } catch (error) {
+    state.settingsError = error && error.message ? error.message : "Could not load store settings.";
+    state.settings = null;
+    return false;
+  }
+}
+function renderSettings() {
+  const page = $("page");
+  if (!state.settings) {
+    page.innerHTML = pageHeading("Store settings","Manage the information customers see on the storefront.") +
+      errorBox(state.settingsError) +
+      '<section class="panel"><div class="panel-body"><h2 style="margin-top:0">Store settings are not configured</h2><p class="muted">Run the one-time database setup to create secure storage for these settings.</p><a class="btn btn-primary" href="./admin-policies.sql" target="_blank" rel="noopener">Open admin database setup ↗</a></div></section>';
+    return;
+  }
+  const s = state.settings;
+  page.innerHTML = pageHeading("Store settings","Edit the storefront branding, homepage message, customer benefits and WhatsApp contact.",'<button class="btn btn-soft" data-action="refresh">↻ Reload</button>') +
+    errorBox(state.settingsError) +
+    '<section class="panel"><div class="panel-head"><h2>Homepage and contact details</h2><span class="small muted">Saved to the shared database</span></div><div class="panel-body"><form id="settings-form"><div id="settings-form-error"></div><div class="form-grid">' +
+    '<div class="field wide"><label for="settings-name">STORE NAME</label><input id="settings-name" name="store_name" maxlength="80" required value="' + esc(s.store_name) + '"></div>' +
+    '<div class="field wide"><label for="settings-title">HOMEPAGE HEADLINE</label><input id="settings-title" name="hero_title" maxlength="160" required value="' + esc(s.hero_title) + '"></div>' +
+    '<div class="field wide"><label for="settings-description">HOMEPAGE DESCRIPTION</label><textarea id="settings-description" name="hero_description" maxlength="300" required>' + esc(s.hero_description) + '</textarea></div>' +
+    '<div class="field"><label for="settings-perk-one">BENEFIT LABEL 1</label><input id="settings-perk-one" name="perk_one" maxlength="60" required value="' + esc(s.perk_one) + '"></div>' +
+    '<div class="field"><label for="settings-perk-two">BENEFIT LABEL 2</label><input id="settings-perk-two" name="perk_two" maxlength="60" required value="' + esc(s.perk_two) + '"></div>' +
+    '<div class="field wide"><label for="settings-perk-three">BENEFIT LABEL 3</label><input id="settings-perk-three" name="perk_three" maxlength="60" required value="' + esc(s.perk_three) + '"></div>' +
+    '<div class="field wide"><label for="settings-whatsapp">WHATSAPP PHONE NUMBER</label><input id="settings-whatsapp" name="whatsapp" inputmode="tel" maxlength="24" required value="' + esc(s.whatsapp) + '" placeholder="201552155041"><div class="small muted">Use the international country code and digits only, without a plus sign.</div></div>' +
+    '</div><div class="notice">The storefront reads these settings from the database. Customers may need to refresh the page to see saved changes.</div><button id="settings-save-button" class="btn btn-primary" type="submit">Save storefront settings</button></form></div></section>';
+}
+async function saveSettingsForm(form) {
+  const button = $("settings-save-button");
+  const errorRoot = $("settings-form-error");
+  const fd = new FormData(form);
+  const settings = {
+    store_name:String(fd.get("store_name") || "").trim(),
+    hero_title:String(fd.get("hero_title") || "").trim(),
+    hero_description:String(fd.get("hero_description") || "").trim(),
+    perk_one:String(fd.get("perk_one") || "").trim(),
+    perk_two:String(fd.get("perk_two") || "").trim(),
+    perk_three:String(fd.get("perk_three") || "").trim(),
+    whatsapp:String(fd.get("whatsapp") || "").replace(/\\D/g,"")
+  };
+  const bounds = [["store_name",80],["hero_title",160],["hero_description",300],["perk_one",60],["perk_two",60],["perk_three",60]];
+  for (const item of bounds) {
+    if (!settings[item[0]] || settings[item[0]].length > item[1]) {
+      errorRoot.innerHTML = '<div class="error">Check the ' + esc(item[0].replace(/_/g," ")) + ' field. It cannot be empty or too long.</div>';
+      const input = form.elements.namedItem(item[0]);
+      if (input) input.focus();
+      return;
+    }
+  }
+  if (settings.whatsapp.length < 8 || settings.whatsapp.length > 20) {
+    errorRoot.innerHTML = '<div class="error">Enter a valid WhatsApp number with its country code.</div>';
+    $("settings-whatsapp").focus();
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Saving…";
+  errorRoot.innerHTML = "";
+  try {
+    const rows = await api("site_settings?id=eq.true",{method:"PATCH",body:{...settings,updated_at:new Date().toISOString()},prefer:"return=representation"});
+    if (!Array.isArray(rows) || !rows.length) throw new Error("No settings row was updated. Run the admin database setup and check permissions.");
+    state.settings = rows[0];
+    renderSettings();
+    setToast("Storefront settings saved.");
+  } catch (error) {
+    errorRoot.innerHTML = '<div class="error">Could not save settings: ' + esc(error && error.message ? error.message : "Unknown error") + '<br><span class="small">If this is a permission error, run the linked admin database setup SQL once in Supabase.</span></div>';
+    button.disabled = false;
+    button.textContent = "Retry save";
   }
 }
 function pageHeading(title, subtitle, action) {
@@ -529,6 +609,9 @@ document.addEventListener("submit", async event => {
   } else if (event.target.id === "product-form") {
     event.preventDefault();
     await submitProductForm(event.target);
+  } else if (event.target.id === "settings-form") {
+    event.preventDefault();
+    await saveSettingsForm(event.target);
   }
 });
 document.addEventListener("input", event => {
