@@ -114,7 +114,7 @@ return `<svg viewBox="0 0 60 60" fill="${f}">${h}<rect x="${g?4:18}" y="25" widt
 function bar(){
 const matches=(i,skip)=>["c","t","s","l"].every(k=>k===skip||!F[k].length||F[k].includes(({c:i.c,t:i.t,s:i.d,l:i.l})[k]));
 const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)));
-const cats=available("c"),types=available("t"),sizes=available("s"),lengths=available("l");
+const cats=[...new Set(ITEMS.map(i=>i.c))].sort((a,b)=>a.localeCompare(b)),types=available("t"),sizes=available("s"),lengths=available("l");
 F.c=F.c.filter(v=>cats.includes(v));F.t=F.t.filter(v=>types.includes(v));F.s=F.s.filter(v=>sizes.includes(v));F.l=F.l.filter(v=>lengths.includes(v));
 const row=(k,lab,vals,f)=>vals.length?`<div class="fr"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
 $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
