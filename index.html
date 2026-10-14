@@ -87,12 +87,17 @@ function build(rows){
 ROWS=rows;CATS={};ROWS.forEach(r=>{const a=CATS[r[0]]=CATS[r[0]]||[];if(!a.includes(r[1]))a.push(r[1])});
 SZ=[...new Set(ROWS.map(r=>r[2]))].sort((a,b)=>a-b);
 LN=[...new Set(ROWS.map(r=>r[3]).filter(Boolean))].sort((a,b)=>a-b);
-ITEMS=ROWS.map(r=>({id:(r[1]+"_"+r[2]+"_"+r[3]).replace(/\W/g,"_"),c:r[0],t:r[1],d:r[2],l:r[3],p:r[4]}));
+ITEMS=ROWS.map(r=>{const material=r[5]==="stainless_steel"?"stainless_steel":"steel";const base=(r[1]+"_"+r[2]+"_"+r[3]).replace(/\W/g,"_");return {id:base+(material==="steel"?"":"_"+material),c:r[0],t:r[1],d:r[2],l:r[3],p:r[4],m:material}});
 byId=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
 }
 async function loadCatalog(){
 LOADERR=0;
-try{build((await fetchAll("products?select=category,type,size,length,price&in_stock=eq.true&order=category,type,size,length")).map(r=>[r.category,r.type,r.size,r.length,+r.price]))}catch(e){LOADERR=1}
+try{
+ let rows;
+ try{rows=await fetchAll("products?select=category,type,size,length,price,material&in_stock=eq.true&order=category,type,size,length,material")}
+ catch(e){rows=(await fetchAll("products?select=category,type,size,length,price&in_stock=eq.true&order=category,type,size,length")).map(r=>({...r,material:"steel"}))}
+ build(rows.map(r=>[r.category,r.type,r.size,r.length,+r.price,r.material||"steel"]));
+}catch(e){LOADERR=1}
 }
 if(CFG.SUPABASE_URL)await loadCatalog();else LOADERR=1;
 const $=id=>document.getElementById(id);
@@ -120,7 +125,7 @@ perks.replaceChildren();
 document.title=name+" — Bolts, Screws, Nuts & Washers";
 }catch(e){/* Use built-in storefront defaults if settings are not configured yet. */}
 }
-let cart={},F={c:[],t:[],s:[],l:[]},shown=30;
+let cart={},F={c:[],t:[],m:[],s:[],l:[]},shown=30;
 try{cart=JSON.parse(localStorage.getItem("bh-cart2")||"{}")}catch(e){cart={}}
 // localStorage is user-controlled: retain only known products and positive integer quantities.
 if(!cart || typeof cart!=="object" || Array.isArray(cart))cart={};
@@ -152,17 +157,18 @@ function ic(i){
  return '<svg viewBox="0 0 60 60" aria-hidden="true">'+shank+head+'<path d="M'+(x+1)+' 36 L'+(x+1)+' 24" stroke="'+c+'" stroke-opacity=".45" stroke-width="1.2"/></svg>';
 }
 function bar(){
-const matches=(i,skip)=>["c","t","s","l"].every(k=>k===skip||!F[k].length||F[k].includes(({c:i.c,t:i.t,s:i.d,l:i.l})[k]));
+const matches=(i,skip)=>["c","t","m","s","l"].every(k=>k===skip||!F[k].length||F[k].includes(({c:i.c,t:i.t,m:i.m,s:i.d,l:i.l})[k]));
 const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)));
 const cats=[...new Set(ITEMS.map(i=>i.c))].sort((a,b)=>a.localeCompare(b)),types=available("t"),sizes=available("s"),lengths=available("l");
 F.c=F.c.filter(v=>cats.includes(v));F.t=F.t.filter(v=>types.includes(v));F.s=F.s.filter(v=>sizes.includes(v));F.l=F.l.filter(v=>lengths.includes(v));
+F.m=F.m.filter(v=>["steel","stainless_steel"].includes(v));
 const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
-$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
+$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("m","Material",["steel","stainless_steel"],v=>v==="stainless_steel"?"Stainless steel":"Steel")+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
 }
 function grid(){
-const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.s,i.d)&&has(F.l,i.l));
+const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l));
 $("cnt").textContent=L.length+" items";
-$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(getWhatsapp().replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
+$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">${i.m==="stainless_steel"?"Stainless steel":"Steel"} · Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(getWhatsapp().replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
 $("more").style.display=L.length>shown?"block":"none";
 }
 function drawer(view){
@@ -185,7 +191,7 @@ const b=e.target.closest("button");
 if(e.target.id=="ov")$("ov").classList.remove("open");
 if(!b)return;
 const d=b.dataset;
-if(d.k=="clr"){F={c:[],t:[],s:[],l:[]};shown=30;bar();grid()}
+if(d.k=="clr"){F={c:[],t:[],m:[],s:[],l:[]};shown=30;bar();grid()}
 else if(d.k=="more"){shown+=30;grid()}
 else if(d.k){if(d.v=="*")F[d.k]=[];else{const v=(d.k=="s"||d.k=="l")?+d.v:d.v,a=F[d.k],i=a.indexOf(v);if(d.k=="l")i<0?a.push(v):a.splice(i,1);else F[d.k]=i<0?[v]:[]}shown=30;bar();grid()}
 if(d.a && byId[d.a]){const n=Math.max(1,Math.min(100000,parseInt($("q"+d.a)?.value,10)||1));cart[d.a]=Math.min(100000,(cart[d.a]||0)+n);save();$("cn").textContent=count();b.textContent="Added ✓";setTimeout(()=>b.textContent="Add",900)}
@@ -215,7 +221,7 @@ ORDER_SAVED=false;
 if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o.name,phone:o.phone,address:o.address,items:o.items,total:o.total},prefer:"return=minimal"});ORDER_SAVED=true}catch(e){if(!getWhatsapp()){b.disabled=false;b.textContent="Place order";$("er").textContent="Could not send the order. Please try again.";return}}}
 LAST=o;cart={};save();drawer("done");
 }
-window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
+window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],m:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
 $("adm").href="./admin.html";
 $("cb").onclick=()=>open();
 if(CFG.SUPABASE_URL)await loadStoreSettings();
