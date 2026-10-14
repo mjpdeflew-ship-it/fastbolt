@@ -64,19 +64,19 @@ footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-siz
 </style>
 </head>
 <body>
-<header><div class="w"><div class="logo">Bolt<b>House</b> 🔩</div><button class="cartbtn" id="cb">Cart (<span id="cn">0</span>)</button></div></header>
+<header><div class="w"><div class="logo"><span id="store-name-first">Bolt</span><b id="store-name-last">House</b> 🔩</div><button class="cartbtn" id="cb">Cart (<span id="cn">0</span>)</button></div></header>
 <main class="w">
 <section class="hero">
-<h1>Bolts, screws, nuts &amp; washers.</h1>
-<p>Metric M3 to M20. Buy a single piece or hundreds — you choose the quantity.</p>
-<div class="perks"><span>Sold per piece</span><span>M3 – M20</span><span>Bulk quotes available</span></div>
+<h1 id="store-hero-title">Bolts, screws, nuts &amp; washers.</h1>
+<p id="store-hero-description">Metric M3 to M20. Buy a single piece or hundreds — you choose the quantity.</p>
+<div class="perks" id="store-perks"><span>Sold per piece</span><span>M3 – M20</span><span>Bulk quotes available</span></div>
 </section>
 <div class="bar" id="bar"></div>
 <div class="cnt" id="cnt"></div>
 <div class="list" id="grid"></div>
 <button class="more" id="more" data-k="more">Show more</button>
 </main>
-<footer><div class="w">© BoltHouse · <a href="./admin.html" id="adm" style="color:inherit">Admin</a></div></footer>
+<footer><div class="w">© <span id="footer-store-name">BoltHouse</span> · <a href="./admin.html" id="adm" style="color:inherit">Admin</a></div></footer>
 <div class="ov" id="ov"><div class="drawer" id="dr"></div></div>
 
 <script src="config.js?v=5f34b5d"></script>
@@ -99,6 +99,27 @@ const $=id=>document.getElementById(id);
 // Escape all catalog/user-controlled strings before inserting them into HTML templates.
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fm=n=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+" EGP";
+const getWhatsapp=()=>String(window.BH_SETTINGS?.whatsapp||CFG.WHATSAPP||"");
+const getStoreName=()=>String(window.BH_SETTINGS?.store_name||"BoltHouse");
+async function loadStoreSettings(){
+try{
+const rows=await api("site_settings?select=store_name,hero_title,hero_description,perk_one,perk_two,perk_three,whatsapp&id=eq.true");
+if(!Array.isArray(rows)||!rows.length)return;
+const s=rows[0];
+window.BH_SETTINGS=s;
+const name=String(s.store_name||"BoltHouse").trim()||"BoltHouse";
+const split=Math.min(name.length,Math.max(1,Math.floor(name.length*4/9)));
+$("store-name-first").textContent=name.slice(0,split);
+$("store-name-last").textContent=name.slice(split);
+$("footer-store-name").textContent=name;
+$("store-hero-title").textContent=s.hero_title||"Bolts, screws, nuts & washers.";
+$("store-hero-description").textContent=s.hero_description||"Metric M3 to M20. Buy a single piece or hundreds — you choose the quantity.";
+const perks=$("store-perks");
+perks.replaceChildren();
+[s.perk_one,s.perk_two,s.perk_three].filter(v=>typeof v==="string"&&v.trim()).forEach(label=>{const span=document.createElement("span");span.textContent=label;perks.appendChild(span)});
+document.title=name+" — Bolts, Screws, Nuts & Washers";
+}catch(e){/* Use built-in storefront defaults if settings are not configured yet. */}
+}
 let cart={},F={c:[],t:[],s:[],l:[]},shown=30;
 try{cart=JSON.parse(localStorage.getItem("bh-cart2")||"{}")}catch(e){cart={}}
 // localStorage is user-controlled: retain only known products and positive integer quantities.
@@ -141,7 +162,7 @@ $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")
 function grid(){
 const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.s,i.d)&&has(F.l,i.l));
 $("cnt").textContent=L.length+" items";
-$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(CFG.WHATSAPP.replace(/\D/g,""))+'?text='+encodeURIComponent("Hello BoltHouse, please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
+$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(CFG.WHATSAPP.replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
 $("more").style.display=L.length>shown?"block":"none";
 }
 function drawer(view){
@@ -150,7 +171,7 @@ let h='<button class="x" data-c="close">×</button>';
 if(view=="co"){
 h+=`<h2>Checkout</h2><div class="f"><input id="nm" placeholder="Full name"><input id="ph" placeholder="Phone"><input id="ad" placeholder="Delivery address"></div><div class="tot"><span>Total</span><span>${fm(total())}</span></div><p id="er" style="color:var(--acc);margin:0"></p><button class="go" data-c="place">Place order</button>`;
 }else if(view=="done"){
-const wa=CFG.WHATSAPP&&LAST?`<a class="go" style="display:block;text-align:center;text-decoration:none;border-radius:8px;margin-bottom:8px" target="_blank" rel="noopener" href="https://wa.me/${CFG.WHATSAPP.replace(/\D/g,"")}?text=${encodeURIComponent(waText(LAST))}">Send order on WhatsApp</a>`:"";
+const wa=getWhatsapp()&&LAST?`<a class="go" style="display:block;text-align:center;text-decoration:none;border-radius:8px;margin-bottom:8px" target="_blank" rel="noopener" href="https://wa.me/${CFG.WHATSAPP.replace(/\D/g,"")}?text=${encodeURIComponent(waText(LAST))}">Send order on WhatsApp</a>`:"";
 h+=`<h2 class="ok">Order ${ORDER_SAVED?"received":"ready"} ✓</h2><p>${ORDER_SAVED?"Thanks! We'll contact you to confirm delivery.":"Your order has not been submitted yet. Tap below to send it to us on WhatsApp."}</p>${wa}<button class="go" data-c="close">Keep shopping</button>`;
 }else{
 const e=Object.entries(cart);
@@ -188,15 +209,16 @@ if(!Object.keys(cart).length){$("er").textContent="Your cart is empty.";return}
 const o={id:"BH"+Date.now().toString(36).toUpperCase(),date:new Date().toISOString(),name:$("nm").value.trim(),phone:$("ph").value.trim(),address:$("ad").value.trim(),total:total(),items:Object.entries(cart).filter(([id,n])=>byId[id] && Number.isSafeInteger(n) && n>0).map(([id,n])=>({name:lab(byId[id]),qty:n,price:byId[id].p}))};
 if(!o.items.length){$("er").textContent="Your cart is empty. Please add an item first.";return}
 if(!o.name||!o.phone||!o.address){$("nm").focus();return}
-if(!CFG.SUPABASE_URL&&!CFG.WHATSAPP){$("er").textContent="Ordering is not set up yet.";return}
+if(!CFG.SUPABASE_URL&&!getWhatsapp()){$("er").textContent="Ordering is not set up yet.";return}
 b.disabled=true;b.textContent="Sending…";
 ORDER_SAVED=false;
-if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o.name,phone:o.phone,address:o.address,items:o.items,total:o.total},prefer:"return=minimal"});ORDER_SAVED=true}catch(e){if(!CFG.WHATSAPP){b.disabled=false;b.textContent="Place order";$("er").textContent="Could not send the order. Please try again.";return}}}
+if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o.name,phone:o.phone,address:o.address,items:o.items,total:o.total},prefer:"return=minimal"});ORDER_SAVED=true}catch(e){if(!getWhatsapp()){b.disabled=false;b.textContent="Place order";$("er").textContent="Could not send the order. Please try again.";return}}}
 LAST=o;cart={};save();drawer("done");
 }
 window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
 $("adm").href="./admin.html";
 $("cb").onclick=()=>open();
+if(CFG.SUPABASE_URL)await loadStoreSettings();
 bar();grid();$("cn").textContent=count();
 </script>
 </body>
