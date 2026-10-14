@@ -50,7 +50,7 @@ USING (
 );
 
 -- Remove any older/overly broad product policies so these rules are authoritative.
-DO $
+DO $cleanup$
 DECLARE p record;
 BEGIN
   FOR p IN
@@ -66,7 +66,7 @@ BEGIN
   LOOP
     EXECUTE format('DROP POLICY %I ON public.products', p.policyname);
   END LOOP;
-END $;
+END $cleanup$;
 
 -- Storefront content/contact details editable from the admin dashboard.
 CREATE TABLE IF NOT EXISTS public.site_settings (
@@ -106,7 +106,7 @@ WITH CHECK (
   OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
 );
 
-DO $
+DO $cleanup$
 DECLARE p record;
 BEGIN
   FOR p IN
@@ -121,7 +121,7 @@ BEGIN
   LOOP
     EXECUTE format('DROP POLICY %I ON public.site_settings', p.policyname);
   END LOOP;
-END $;
+END $cleanup$;
 
 -- Add order workflow status while keeping existing orders.
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -158,7 +158,7 @@ WITH CHECK (
 );
 
 -- Orders contain customer contact details: only admins may read them or update status.
-DO $
+DO $cleanup$
 DECLARE p record;
 BEGIN
   FOR p IN
@@ -174,4 +174,4 @@ BEGIN
   LOOP
     EXECUTE format('DROP POLICY %I ON public.orders', p.policyname);
   END LOOP;
-END $;
+END $cleanup$;
