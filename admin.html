@@ -129,6 +129,88 @@ tbody tr:hover{background:rgba(128,128,128,.035)}
 @media(max-width:1000px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-layout{grid-template-columns:210px minmax(0,1fr)}.sidebar{padding-left:10px;padding-right:10px}}
 @media(max-width:760px){.admin-layout{display:flex;flex-direction:column}.sidebar{position:static;min-height:0;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:12px;gap:12px}.sidebar .brand{padding:0 4px}.side-nav-wrap{display:flex;align-items:center;gap:10px;overflow-x:auto}.side-nav-wrap .nav-label{display:none}.nav{flex-direction:row;gap:5px;min-width:max-content}.nav button{width:auto;padding:9px 11px}.nav button .nav-icon{width:auto}.side-bottom{display:none}.topbar{height:60px;padding:0 16px}.page{padding:21px 14px 35px}.page-heading{align-items:flex-start}.page-heading .btn{white-space:normal}.order-main{grid-template-columns:1fr;gap:12px}.quick-grid{grid-template-columns:1fr}}
 @media(max-width:470px){.stats{gap:9px}.stat{padding:13px}.stat-value{font-size:24px}.stat-top{font-size:11px}.top-title{font-size:16px}.top-actions .btn{padding:8px 9px;font-size:12px}.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.toolbar .category-filter{width:100%}.results-count{width:100%;margin-left:0}.page-heading{flex-direction:column}.order-card{padding:13px}}
+/* Match the storefront's simple BoltHouse visual language. */
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d2229;--mut:#5d6672;--line:#e1ded7;--acc:#d9480f;--on:#fff;--ok:#2b8a3e;--warn:#9a6700;--shadow:0 8px 28px rgba(29,34,41,.045);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;--warn:#ffd666;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;color-scheme:dark}
+body{font-size:16px;line-height:1.5}
+a{color:inherit}
+.admin-layout{display:block;min-height:100vh}
+.sidebar{display:none}
+.topbar{height:auto;min-height:60px;position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:0}
+.topbar-inner{max-width:1000px;min-height:60px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%}
+.store-brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:20px;font-weight:800;letter-spacing:-.5px;text-decoration:none;white-space:nowrap}
+.store-brand b{color:var(--acc)}
+.admin-label{font-size:10px;letter-spacing:.1em;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-weight:750}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.admin-email{font-size:12px;color:var(--mut);max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-actions .btn{padding:7px 11px;font-size:13px}
+.nav-shell{background:var(--bg);border-bottom:1px solid var(--line)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:11px 16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.nav button{display:inline-flex;align-items:center;gap:7px;width:auto;border:1px solid var(--line);border-radius:9px;padding:7px 12px;background:var(--card);color:var(--ink);font-size:13px;font-weight:600;white-space:nowrap;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.nav button:hover:not(.active){border-color:var(--acc);background:var(--card);color:var(--ink)}
+.nav button.active{background:var(--acc);border-color:var(--acc);color:var(--on)}
+.nav-icon{width:auto;font-size:14px}
+.setup-link{font-size:12px;color:var(--mut);margin-left:auto;padding:7px 4px;text-decoration:none}
+.setup-link:hover{color:var(--acc)}
+.page{max-width:1000px;margin:0 auto;padding:26px 16px 48px}
+.page-heading{margin-bottom:18px}
+.page-heading h1{font-size:clamp(28px,5.5vw,42px);line-height:1.08;letter-spacing:-1.2px;font-weight:800}
+.page-heading p{font-size:14px;max-width:650px}
+.stats{gap:10px;margin-bottom:18px}
+.stat{border-radius:10px;padding:15px;background:var(--card);box-shadow:none}
+.stat-icon{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.stat-value{font-size:clamp(23px,3vw,30px);letter-spacing:-.6px}
+.panel,.quick-card,.order-card{border-radius:11px;box-shadow:none}
+.panel-head{padding:14px 16px}
+.panel-body{padding:16px}
+.quick-grid{gap:10px;margin-bottom:18px}
+.quick-card{padding:13px;border-radius:10px}
+.quick-icon{background:var(--bg);border:1px solid var(--line);border-radius:9px}
+.toolbar input,.toolbar select,.field input,.field select,.field textarea,.status-select{background:var(--card);border-radius:8px}
+.btn{border-radius:8px;font-weight:650}
+.btn-primary{background:var(--acc);color:var(--on)}
+.btn-soft{background:var(--card);color:var(--ink);border-color:var(--line)}
+.btn-soft:hover{border-color:var(--acc)}
+.btn-danger{border-radius:8px}
+.badge{border-radius:8px}
+.order-list{gap:8px}
+.order-card{padding:14px}
+.modal{border-radius:12px;box-shadow:var(--shadow)}
+.modal-head,.modal-body{padding:16px}
+.modal-footer{padding:12px 16px}
+.auth-card{border-radius:12px;box-shadow:var(--shadow);padding:26px}
+.brand-mark{border-radius:8px}
+@media(max-width:760px){
+ .topbar-inner{padding:0 12px;min-height:60px}
+ .store-brand{font-size:18px}
+ .admin-email{display:none}
+ .top-actions .btn{font-size:12px;padding:7px 9px}
+ .nav-inner{padding:10px 12px;gap:6px}
+ .nav button{padding:7px 10px;font-size:12px}
+ .setup-link{margin-left:0}
+ .page{padding:22px 12px 35px}
+ .page-heading{align-items:flex-start}
+ .order-main{grid-template-columns:1fr;gap:12px}
+ .quick-grid{grid-template-columns:1fr}
+}
+@media(max-width:470px){
+ .topbar-inner{gap:6px}
+ .store-brand{font-size:16px;gap:6px}
+ .admin-label{font-size:9px;padding:2px 4px}
+ .top-actions{gap:5px}
+ .top-actions .btn{padding:6px 7px;font-size:11px}
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .stat{padding:12px}
+ .stat-value{font-size:22px}
+ .page-heading h1{font-size:29px}
+ .form-grid{grid-template-columns:1fr}
+ .form-grid .wide{grid-column:auto}
+ .toolbar .category-filter{width:100%}
+ .results-count{width:100%;margin-left:0}
+ .page-heading{flex-direction:column}
+ .order-card{padding:12px}
+}
 </style>
 </head>
 <body>
@@ -176,10 +258,9 @@ function renderDenied() {
 function renderShell() {
   const email = state.auth && state.auth.user && state.auth.user.email ? state.auth.user.email : "Administrator";
   const nav = [{id:"overview",icon:"▦",label:"Overview"},{id:"products",icon:"◇",label:"Products"},{id:"orders",icon:"▤",label:"Orders"},{id:"settings",icon:"⚙",label:"Store settings"}];
-  $("root").innerHTML = '<div class="admin-layout"><aside class="sidebar"><a class="brand" href="./index.html"><span class="brand-mark">🔩</span><span>Bolt<b>House</b></span></a><div class="side-nav-wrap"><div><div class="nav-label">WORKSPACE</div><nav class="nav">' +
-    nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '"><span class="nav-icon">' + item.icon + '</span><span>' + item.label + '</span></button>').join("") +
-    '</nav></div></div><div class="side-bottom"><div class="side-email">Signed in as<br><strong>' + esc(email) + '</strong></div><button class="btn btn-soft btn-block" data-action="logout">↪ Sign out</button><p class="small muted"><a href="./admin-policies.sql" target="_blank" rel="noopener">Admin database setup</a></p></div></aside>' +
-    '<main class="main"><header class="topbar"><div><div id="top-title" class="top-title">Overview</div><div class="muted small">BoltHouse store management</div></div><div class="top-actions"><a class="btn btn-soft" href="./index.html">View store ↗</a><div class="avatar">' + esc(String(email).charAt(0).toUpperCase()) + '</div></div></header><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main></div>';
+  $("root").innerHTML = '<div class="admin-layout"><header class="topbar"><div class="topbar-inner"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><div class="top-actions"><span class="admin-email">' + esc(email) + '</span><a class="btn btn-soft" href="./index.html">View store ↗</a><button class="btn btn-soft" data-action="logout">Sign out</button></div></div></header>' +
+    '<div class="nav-shell"><nav class="nav nav-inner">' + nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '"><span class="nav-icon">' + item.icon + '</span><span>' + item.label + '</span></button>').join("") + '<a class="setup-link" href="./admin-policies.sql" target="_blank" rel="noopener">Database setup ↗</a></nav></div>' +
+    '<main class="main"><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main></div>';
 }
 function setPageTitle(title) {
   const node = $("top-title");
