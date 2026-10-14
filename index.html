@@ -177,12 +177,12 @@ if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o
 LAST=o;cart={};save();drawer("done");
 }
 window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
-$("adm").onclick=e=>{e.preventDefault();if(session())import("./admin.js?v=3cc5c0").then(m=>m.start());else{$("ov").classList.add("open");$("dr").innerHTML='<button class="x" data-c="close">×</button><h2>Admin login</h2><div class="f"><input id="le" type="email" placeholder="Email" autocomplete="username"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"></div><p id="lerr" style="color:var(--acc);margin:0"></p><button class="go" data-c="login">Log in</button>'}};
+$("adm").onclick=e=>{e.preventDefault();if(session())import("./admin.js?v=c6b7b5").then(m=>m.start());else{$("ov").classList.add("open");$("dr").innerHTML='<button class="x" data-c="close">×</button><h2>Admin login</h2><div class="f"><input id="le" type="email" placeholder="Email" autocomplete="username"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"></div><p id="lerr" style="color:var(--acc);margin:0"></p><button class="go" data-c="login">Log in</button>'}};
 document.addEventListener("click",async e=>{const b=e.target.closest("button");if(!b||b.dataset.c!="login")return;
-try{b.disabled=true;await login($("le").value.trim(),$("lp").value);$("ov").classList.remove("open");(await import("./admin.js?v=3cc5c0")).start()}catch(x){$("lerr").textContent=x.message;b.disabled=false}});
+try{b.disabled=true;await login($("le").value.trim(),$("lp").value);$("ov").classList.remove("open");(await import("./admin.js?v=c6b7b5")).start()}catch(x){$("lerr").textContent=x.message;b.disabled=false}});
 $("cb").onclick=()=>open();
 bar();grid();$("cn").textContent=count();
-if(session())import("./admin.js?v=3cc5c0").then(m=>m.start()).catch(()=>{});
+if(session())import("./admin.js?v=c6b7b5").then(m=>m.start()).catch(()=>{});
 </script>
 </body>
 </html>
