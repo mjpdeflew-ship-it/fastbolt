@@ -3,7 +3,7 @@
 -- The page performs owner checks in the UI; these policies enforce access in the database.
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
+REVOKE ALL ON public.products FROM anon, authenticated, PUBLIC;
 GRANT SELECT ON public.products TO anon, authenticated;
 GRANT INSERT, DELETE ON public.products TO authenticated;
 GRANT UPDATE (category, type, size, length, price, in_stock) ON public.products TO authenticated;
@@ -49,6 +49,25 @@ USING (
   OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
 );
 
+-- Remove any older/overly broad product policies so these rules are authoritative.
+DO $
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname, cmd FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'products'
+      AND (
+        cmd = 'ALL'
+        OR (cmd = 'SELECT' AND policyname <> 'BoltHouse product catalogue visibility')
+        OR (cmd = 'INSERT' AND policyname <> 'BoltHouse admins can insert products')
+        OR (cmd = 'UPDATE' AND policyname <> 'BoltHouse admins can update products')
+        OR (cmd = 'DELETE' AND policyname <> 'BoltHouse admins can delete products')
+      )
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.products', p.policyname);
+  END LOOP;
+END $;
+
 -- Storefront content/contact details editable from the admin dashboard.
 CREATE TABLE IF NOT EXISTS public.site_settings (
   id boolean PRIMARY KEY DEFAULT true CHECK (id = true),
@@ -63,6 +82,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
 );
 
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.site_settings FROM anon, authenticated, PUBLIC;
 GRANT SELECT ON public.site_settings TO anon, authenticated;
 GRANT UPDATE (store_name, hero_title, hero_description, perk_one, perk_two, perk_three, whatsapp, updated_at) ON public.site_settings TO authenticated;
 
@@ -86,9 +106,27 @@ WITH CHECK (
   OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
 );
 
+DO $
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname, cmd FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'site_settings'
+      AND (
+        cmd = 'ALL'
+        OR (cmd = 'SELECT' AND policyname <> 'BoltHouse public settings read')
+        OR (cmd = 'UPDATE' AND policyname <> 'BoltHouse admins can update settings')
+        OR cmd IN ('INSERT', 'DELETE')
+      )
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.site_settings', p.policyname);
+  END LOOP;
+END $;
+
 -- Add order workflow status while keeping existing orders.
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'new';
+REVOKE ALL ON public.orders FROM anon, authenticated, PUBLIC;
 GRANT INSERT ON public.orders TO anon, authenticated;
 GRANT SELECT ON public.orders TO authenticated;
 GRANT UPDATE (status) ON public.orders TO authenticated;
@@ -118,3 +156,22 @@ WITH CHECK (
   (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
   OR COALESCE(auth.jwt() -> 'app_metadata' -> 'roles', '[]'::jsonb) ? 'admin'
 );
+
+-- Orders contain customer contact details: only admins may read them or update status.
+DO $
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname, cmd FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'orders'
+      AND (
+        cmd = 'ALL'
+        OR (cmd = 'SELECT' AND policyname <> 'BoltHouse admins can read orders')
+        OR (cmd = 'INSERT' AND policyname <> 'BoltHouse customers can submit orders')
+        OR (cmd = 'UPDATE' AND policyname <> 'BoltHouse admins can update order status')
+        OR cmd = 'DELETE'
+      )
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.orders', p.policyname);
+  END LOOP;
+END $;
