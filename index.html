@@ -202,7 +202,7 @@ $("bar").innerHTML='<div class="catalog-search"><label for="product-search">Sear
 }
 function grid(){
 const query=searchTerm.trim().toLocaleLowerCase();
-const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l)&&(!query||[i.c,i.t,i.d,i.l,i.m==="stainless_steel"?"stainless steel":"steel"].some(v=>String(v??"").toLocaleLowerCase().includes(query))));
+const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l)&&(!query||[i.c,i.c+"s",i.t,"m"+i.d,i.d,i.l,i.l==null?"":i.l+" mm",i.m==="stainless_steel"?"stainless steel":"steel"].some(v=>String(v??"").toLocaleLowerCase().includes(query))));
 $("cnt").textContent=L.length+(L.length===1?" item":" items");
 $("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">${i.m==="stainless_steel"?"Stainless steel":"Steel"} · Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(getWhatsapp().replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
 $("more").style.display=L.length>shown?"block":"none";
