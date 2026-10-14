@@ -3,10 +3,20 @@
 -- The page performs owner checks in the UI; these policies enforce access in the database.
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+-- Material filtering for steel and stainless steel. Existing rows default to steel;
+-- change any stainless-steel products in the admin page after this migration.
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS material text NOT NULL DEFAULT 'steel';
+UPDATE public.products SET material = 'steel' WHERE material IS NULL OR material NOT IN ('steel', 'stainless_steel');
+ALTER TABLE public.products ALTER COLUMN material SET DEFAULT 'steel';
+ALTER TABLE public.products ALTER COLUMN material SET NOT NULL;
+ALTER TABLE public.products DROP CONSTRAINT IF EXISTS products_material_check;
+ALTER TABLE public.products ADD CONSTRAINT products_material_check CHECK (material IN ('steel', 'stainless_steel'));
+
 REVOKE ALL ON public.products FROM anon, authenticated, PUBLIC;
 GRANT SELECT ON public.products TO anon, authenticated;
 GRANT INSERT, DELETE ON public.products TO authenticated;
-GRANT UPDATE (category, type, size, length, price, in_stock) ON public.products TO authenticated;
+GRANT UPDATE (category, type, size, length, price, in_stock, material) ON public.products TO authenticated;
 
 DROP POLICY IF EXISTS "Anyone can view in-stock products" ON public.products;
 DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
