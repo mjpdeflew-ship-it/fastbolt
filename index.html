@@ -76,12 +76,12 @@ footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-siz
 <div class="list" id="grid"></div>
 <button class="more" id="more" data-k="more">Show more</button>
 </main>
-<footer><div class="w">© BoltHouse · <a href="#" id="adm" style="color:inherit">Admin</a></div></footer>
+<footer><div class="w">© BoltHouse · <a href="./admin.html" id="adm" style="color:inherit">Admin</a></div></footer>
 <div class="ov" id="ov"><div class="drawer" id="dr"></div></div>
 
 <script src="config.js?v=5f34b5d"></script>
 <script type="module">
-import {CFG,api,session,login,fetchAll} from "./api.js";
+import {CFG,api,fetchAll} from "./api.js";
 let LOADERR=0,ROWS=[],CATS={},SZ=[],LN=[],ITEMS=[],byId={};
 function build(rows){
 ROWS=rows;CATS={};ROWS.forEach(r=>{const a=CATS[r[0]]=CATS[r[0]]||[];if(!a.includes(r[1]))a.push(r[1])});
@@ -195,12 +195,9 @@ if(CFG.SUPABASE_URL){try{await api("orders",{method:"POST",body:{ref:o.id,name:o
 LAST=o;cart={};save();drawer("done");
 }
 window.BH={reload:async()=>{await loadCatalog();F={c:[],t:[],s:[],l:[]};for(const k in cart)if(!byId[k])delete cart[k];save();$("cn").textContent=count();bar();grid()}};
-$("adm").onclick=e=>{e.preventDefault();if(session())import("./admin.js?v=c6b7b5").then(m=>m.start());else{$("ov").classList.add("open");$("dr").innerHTML='<button class="x" data-c="close">×</button><h2>Admin login</h2><div class="f"><input id="le" type="email" placeholder="Email" autocomplete="username"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"></div><p id="lerr" style="color:var(--acc);margin:0"></p><button class="go" data-c="login">Log in</button>'}};
-document.addEventListener("click",async e=>{const b=e.target.closest("button");if(!b||b.dataset.c!="login")return;
-try{b.disabled=true;await login($("le").value.trim(),$("lp").value);$("ov").classList.remove("open");(await import("./admin.js?v=c6b7b5")).start()}catch(x){$("lerr").textContent=x.message;b.disabled=false}});
+$("adm").href="./admin.html";
 $("cb").onclick=()=>open();
 bar();grid();$("cn").textContent=count();
-if(session())import("./admin.js?v=c6b7b5").then(m=>m.start()).catch(()=>{});
 </script>
 </body>
 </html>
