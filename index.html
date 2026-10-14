@@ -193,7 +193,7 @@ const sizes=available("s");
 F.s=F.s.filter(v=>sizes.includes(v));
 const lengths=available("l");
 F.l=F.l.filter(v=>lengths.includes(v));
-const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips"><button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
+const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips">${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
  $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+
  row("m","Material",materials,v=>v==="stainless_steel"?"Stainless steel":"Steel")+
  row("t","Type",types)+
