@@ -61,6 +61,12 @@ footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-siz
 .x{background:none;color:var(--mut);float:right;font-size:22px}
 .f{display:flex;flex-direction:column;gap:8px}
 .ok{color:var(--ok);font-weight:600}
+
+.filter-row-c .chip{min-height:38px;padding:8px 15px;font-weight:700}
+.filter-row-m .chip{min-width:82px}
+.filter-row-s .chip,.filter-row-l .chip{font-variant-numeric:tabular-nums}
+.fr:not(:first-child){border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent);padding-top:13px}
+.clr{margin-top:1px}
 </style>
 </head>
 <body>
@@ -158,12 +164,27 @@ function ic(i){
 }
 function bar(){
 const matches=(i,skip)=>["c","t","m","s","l"].every(k=>k===skip||!F[k].length||F[k].includes(({c:i.c,t:i.t,m:i.m,s:i.d,l:i.l})[k]));
-const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)));
-const cats=[...new Set(ITEMS.map(i=>i.c))].sort((a,b)=>a.localeCompare(b)),types=available("t"),sizes=available("s"),lengths=available("l");
-F.c=F.c.filter(v=>cats.includes(v));F.t=F.t.filter(v=>types.includes(v));F.s=F.s.filter(v=>sizes.includes(v));F.l=F.l.filter(v=>lengths.includes(v));
-F.m=F.m.filter(v=>["steel","stainless_steel"].includes(v));
-const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips">${k=="l"?"":`<button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>`}${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
-$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+row("t","Type",types)+row("m","Material",["steel","stainless_steel"],v=>v==="stainless_steel"?"Stainless steel":"Steel")+row("s","Size",sizes,v=>"M"+v)+row("l","Length",lengths,v=>v+" mm")+'<button class="clr" data-k="clr">Clear filters</button>';
+const available=k=>[...new Set(ITEMS.filter(i=>matches(i,k)).map(i=>({c:i.c,t:i.t,m:i.m,s:i.d,l:i.l})[k]).filter(v=>v!==null&&v!==undefined&&v!==""))].sort((a,b)=>{
+ if(typeof a==="number"&&typeof b==="number")return a-b;
+ if(k==="m")return (a==="steel"?0:1)-(b==="steel"?0:1);
+ return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"});
+});
+const categoryOrder=["bolt","screw","nut","washer"];
+const existingCats=[...new Set(ITEMS.map(i=>i.c))];
+const cats=categoryOrder.filter(c=>existingCats.includes(c)).concat(existingCats.filter(c=>!categoryOrder.includes(c)).sort((a,b)=>a.localeCompare(b)));
+const types=available("t"),materials=available("m"),sizes=available("s"),lengths=available("l");
+F.c=F.c.filter(v=>cats.includes(v));
+F.t=F.t.filter(v=>types.includes(v));
+F.m=F.m.filter(v=>materials.includes(v));
+F.s=F.s.filter(v=>sizes.includes(v));
+F.l=F.l.filter(v=>lengths.includes(v));
+const row=(k,lab,vals,f)=>vals.length?`<div class="fr filter-row filter-row-${esc(k)}"><label>${esc(lab)}</label><div class="chips"><button class="chip ${F[k].length?"":"on"}" aria-pressed="${F[k].length?"false":"true"}" data-k="${esc(k)}" data-v="*">All</button>${vals.map(v=>`<button class="chip ${F[k].includes(v)?"on":""}" aria-pressed="${F[k].includes(v)?"true":"false"}" data-k="${esc(k)}" data-v="${esc(v)}">${esc(f?f(v):v)}</button>`).join("")}</div></div>`:"";
+$("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")+
+ row("t","Type",types)+
+ row("m","Material",materials,v=>v==="stainless_steel"?"Stainless steel":"Steel")+
+ row("s","Size",sizes,v=>"M"+v)+
+ row("l","Length",lengths,v=>v+" mm")+
+ '<button class="clr" data-k="clr">Clear filters</button>';
 }
 function grid(){
 const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.m,i.m)&&has(F.s,i.d)&&has(F.l,i.l));
