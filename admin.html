@@ -217,7 +217,7 @@ function renderDenied() {
 }
 function renderShell() {
   const email = state.auth && state.auth.user && state.auth.user.email ? state.auth.user.email : "Administrator";
-  const nav = [{id:"overview",label:"Overview"},{id:"products",label:"Products"},{id:"orders",label:"Orders"},{id:"settings",label:"Store settings"}];
+  const nav = [{id:"overview",label:"Overview"},{id:"products",label:"Products"},{id:"orders",label:"Orders"}];
   $("root").innerHTML = '<div class="admin-layout"><header class="shop-header"><div class="w shop-header-inner"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><div class="top-actions"><span class="admin-email">' + esc(email) + '</span><a class="cartbtn" href="./index.html">View store ↗</a><button class="signout-btn" data-action="logout">Sign out</button></div></div></header><main class="w main"><nav class="admin-nav"><div class="nav">' +
     nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '">' + item.label + '</button>').join("") +
     '</div><a class="setup-link" href="./admin-policies.sql" target="_blank" rel="noopener">Database setup ↗</a></nav><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main><footer class="admin-footer"><div class="w">© BoltHouse · Store management</div></footer></div>';
@@ -280,7 +280,7 @@ async function loadOrdersData() {
   }
 }
 async function navigate(route) {
-  if (!["overview","products","orders","settings"].includes(route)) route = "overview";
+  if (!["overview","products","orders"].includes(route)) route = "overview";
   state.route = route;
   setPageTitle(route === "overview" ? "Overview" : route === "settings" ? "Store settings" : pretty(route));
   const page = $("page");
