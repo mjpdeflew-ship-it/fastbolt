@@ -268,7 +268,8 @@ function recentOrdersHtml(rows) {
   if (!rows.length) return emptyState("▤","No orders yet","New customer orders will appear here.");
   return '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Order value</th><th>Date</th><th>Status</th></tr></thead><tbody>' + rows.slice(0,5).map(order => {
     const value = order.status || "new";
-    return '<tr><td><strong>' + esc(order.ref || "Order") + '</strong></td><td>' + esc(order.name || "—") + '</td><td><strong>' + money(order.total) + '</strong></td><td>' + esc(dateText(order.created_at)) + '</td><td><span class="badge ' + statusClass(value) + '">' + esc(statusLabel(value)) + '</span></td></tr>';
+    const statusBadge = state.ordersStatusSupported ? '<span class="badge ' + statusClass(value) + '">' + esc(statusLabel(value)) + '</span>' : '<span class="badge status-cancelled">Status setup required</span>';
+    return '<tr><td><strong>' + esc(order.ref || "Order") + '</strong></td><td>' + esc(order.name || "—") + '</td><td><strong>' + money(order.total) + '</strong></td><td>' + esc(dateText(order.created_at)) + '</td><td>' + statusBadge + '</td></tr>';
   }).join("") + '</tbody></table></div>';
 }
 function renderOverview() {
@@ -433,7 +434,8 @@ function renderOrderResults() {
     const phoneDigits = String(order.phone || "").replace(/\D/g,"");
     const phoneLink = phoneDigits ? '<a href="https://wa.me/' + esc(phoneDigits) + '" target="_blank" rel="noopener">WhatsApp customer ↗</a>' : '<span class="muted">No phone number</span>';
     const status = order.status || "new";
-    return '<article class="order-card"><div class="order-top"><div><div class="order-ref">' + esc(order.ref || "Order") + '</div><div class="order-date">' + esc(dateText(order.created_at)) + '</div></div><div><div class="order-total">' + money(order.total) + '</div><span class="badge ' + statusClass(status) + '">' + esc(statusLabel(status)) + '</span></div></div><div class="order-main"><div class="order-customer"><strong>' + esc(order.name || "Customer") + '</strong><div>' + esc(order.phone || "No phone") + '</div><div>' + esc(order.address || "No address") + '</div><div style="margin-top:7px">' + phoneLink + '</div></div><div><div class="small muted" style="font-weight:800;margin-bottom:5px">ORDER ITEMS</div><ul class="order-items">' + itemHtml + '</ul></div></div><div class="order-actions"><span class="small muted">Status</span>' + orderStatusSelect(order) + '<button class="btn btn-soft btn-small" data-action="copy-order" data-ref="' + esc(order.ref || "") + '">Copy details</button></div></article>';
+    const statusBadge = state.ordersStatusSupported ? '<span class="badge ' + statusClass(status) + '">' + esc(statusLabel(status)) + '</span>' : '<span class="badge status-cancelled">Status setup required</span>';
+    return '<article class="order-card"><div class="order-top"><div><div class="order-ref">' + esc(order.ref || "Order") + '</div><div class="order-date">' + esc(dateText(order.created_at)) + '</div></div><div><div class="order-total">' + money(order.total) + '</div>' + statusBadge + '</div></div><div class="order-main"><div class="order-customer"><strong>' + esc(order.name || "Customer") + '</strong><div>' + esc(order.phone || "No phone") + '</div><div>' + esc(order.address || "No address") + '</div><div style="margin-top:7px">' + phoneLink + '</div></div><div><div class="small muted" style="font-weight:800;margin-bottom:5px">ORDER ITEMS</div><ul class="order-items">' + itemHtml + '</ul></div></div><div class="order-actions"><span class="small muted">Status</span>' + orderStatusSelect(order) + '<button class="btn btn-soft btn-small" data-action="copy-order" data-ref="' + esc(order.ref || "") + '">Copy details</button></div></article>';
   }).join("") + '</div>';
 }
 async function updateOrderStatus(select) {
@@ -475,7 +477,7 @@ function exportOrders() {
 function copyOrder(ref) {
   const order = state.orders.find(item => String(item.ref) === ref);
   if (!order) return;
-  const text = [ "Order: " + (order.ref || ""), "Date: " + dateText(order.created_at), "Name: " + (order.name || ""), "Phone: " + (order.phone || ""), "Address: " + (order.address || ""), "Total: " + money(order.total), "Status: " + statusLabel(order.status || "new"), "Items: " + normalItems(order).map(item => item.qty + " x " + item.name).join("; ") ].join("\n");
+  const text = [ "Order: " + (order.ref || ""), "Date: " + dateText(order.created_at), "Name: " + (order.name || ""), "Phone: " + (order.phone || ""), "Address: " + (order.address || ""), "Total: " + money(order.total), "Status: " + (state.ordersStatusSupported ? statusLabel(order.status || "new") : "Status not configured"), "Items: " + normalItems(order).map(item => item.qty + " x " + item.name).join("; ") ].join("\n");
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => setToast("Order details copied." )).catch(() => window.prompt("Copy order details:",text));
   else window.prompt("Copy order details:",text);
 }
