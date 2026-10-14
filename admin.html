@@ -614,7 +614,7 @@ async function submitProductForm(form) {
   const lengthRaw = String(fd.get("length") || "").trim();
   const price = Number(fd.get("price"));
   const data = {category,type,size,length:((category === "bolt" || category === "screw") && lengthRaw !== "") ? Number(lengthRaw) : null,price,in_stock:fd.get("in_stock") === "on"};
-  if (state.materialSupported) data.material = String(fd.get("material") || "steel"); else data.material = old?.material || "steel";
+  if (state.materialSupported) data.material = String(fd.get("material") || "steel");
   const old = state.editing;
   if (!["steel","stainless_steel"].includes(data.material)) { errorRoot.innerHTML = '<div class="error">Choose Steel or Stainless steel.</div>'; return; }
   if (!["bolt","screw","nut","washer"].includes(category)) { errorRoot.innerHTML = '<div class="error">Choose a valid category.</div>'; return; }
