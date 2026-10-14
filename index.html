@@ -37,6 +37,8 @@ button{font:inherit;cursor:pointer;border:0;border-radius:8px}
 .chip:hover:not(.on){background:var(--bg);border-color:var(--acc)}
 .chip:active{transform:scale(.98)}
 .chip.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
+/* Safety fallback: hide legacy "All" filter chips even if an older filter template is cached. */
+.chip[data-v="*"]{display:none!important}
 .chip:focus-visible,.clr:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
 .clr{display:inline-flex;align-items:center;align-self:flex-start;background:var(--bg);color:var(--mut);border:1px solid var(--line);border-radius:8px;text-decoration:none;padding:7px 11px;font-size:12px;font-weight:650;transition:color .15s ease,border-color .15s ease}
 .clr:hover{color:var(--acc);border-color:var(--acc)}
