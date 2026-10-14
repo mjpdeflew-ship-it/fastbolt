@@ -6,14 +6,8 @@
 <meta name="theme-color" content="#f6f5f2">
 <title>BoltHouse Admin</title>
 <style>
-:root{
-  --bg:#f6f5f2;--card:#fff;--ink:#1d2229;--mut:#5d6672;--line:#e1ded7;
-  --acc:#d9480f;--on:#fff;--ok:#2b8a3e;--warn:#9a6700;--shadow:none;
-  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)
-}
-@media(prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;--warn:#ffd666;color-scheme:dark}
-}
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d2229;--mut:#5d6672;--line:#e1ded7;--acc:#d9480f;--on:#fff;--ok:#2b8a3e;--warn:#9a6700;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;--warn:#ffd666;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#14171b;--card:#1d2127;--ink:#eceae4;--mut:#9aa3ad;--line:#2d333b;--acc:#ff7a3d;--on:#14171b;--ok:#69db7c;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -23,12 +17,13 @@ button{cursor:pointer;border:0;border-radius:8px}
 button:disabled{opacity:.58;cursor:wait}
 a{color:var(--acc)}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.w{max-width:1000px;margin:0 auto;padding:0 16px}
 .loading-screen{min-height:220px;display:grid;place-items:center;color:var(--mut)}
 .auth-wrap{min-height:100vh;display:grid;place-items:center;padding:22px}
 .auth-card{width:min(420px,100%);padding:26px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:none}
 .brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;letter-spacing:-.5px;color:var(--ink);text-decoration:none}
-.brand-mark{display:grid;place-items:center;background:var(--acc);color:var(--on);width:38px;height:38px;border-radius:8px;font-size:21px}
 .brand b,.store-brand b{color:var(--acc)}
+.brand-mark{display:none}
 .muted{color:var(--mut)}
 .small{font-size:12px}
 .field{display:flex;flex-direction:column;gap:6px;margin:12px 0}
@@ -49,25 +44,26 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .admin-layout{display:block;min-height:100vh}
 .sidebar{display:none}
 .main{min-width:0}
-.topbar{min-height:60px;height:auto;position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:0}
-.topbar-inner{max-width:1000px;min-height:60px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%}
+.shop-header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.shop-header-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;height:60px}
 .store-brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:20px;font-weight:800;letter-spacing:-.5px;text-decoration:none;white-space:nowrap}
 .admin-label{font-size:10px;letter-spacing:.08em;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-weight:750}
 .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.admin-email{font-size:12px;color:var(--mut);max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top-actions .btn{padding:7px 10px;font-size:12px}
+.admin-email{font-size:12px;color:var(--mut);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cartbtn{background:var(--ink);color:var(--bg);padding:8px 13px;font-weight:650}
+.signout-btn{background:transparent;color:var(--mut);border:1px solid var(--line);padding:7px 11px;font-size:13px}
+.signout-btn:hover{border-color:var(--acc);color:var(--ink)}
 .avatar{display:none}
-.nav-shell{background:var(--bg);border-bottom:1px solid var(--line)}
-.nav-inner{max-width:1000px;margin:0 auto;padding:10px 16px;display:flex;flex-direction:row;align-items:center;gap:7px;flex-wrap:wrap}
-.nav{display:flex;flex-direction:row;gap:7px;align-items:center}
+.admin-nav{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:16px 0 20px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.nav{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .nav-label{display:none}
-.nav button{display:inline-flex;align-items:center;gap:7px;width:auto;border:1px solid var(--line);border-radius:8px;padding:7px 12px;background:var(--card);color:var(--ink);font-size:13px;font-weight:600;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
-.nav button:hover:not(.active){border-color:var(--acc);background:var(--card);color:var(--ink)}
+.nav button{display:inline-flex;align-items:center;justify-content:center;width:auto;border:1px solid transparent;border-radius:8px;padding:8px 13px;background:transparent;color:var(--mut);font-size:13px;font-weight:650;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.nav button:hover:not(.active){border-color:var(--line);background:var(--bg);color:var(--ink)}
 .nav button.active{background:var(--acc);border-color:var(--acc);color:var(--on)}
-.nav-icon{width:auto;text-align:center;font-size:14px}
-.setup-link{font-size:12px;color:var(--mut);margin-left:auto;padding:7px 2px;text-decoration:none}
+.nav-icon{display:none}
+.setup-link{font-size:12px;color:var(--mut);margin-left:auto;padding:7px 6px;text-decoration:none;white-space:nowrap}
 .setup-link:hover{color:var(--acc)}
-.page{max-width:1000px;margin:0 auto;padding:28px 16px 48px}
+.page{max-width:1000px;margin:0 auto;padding:4px 0 48px}
 .page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
 .page-heading h1{font-size:clamp(28px,5.2vw,42px);line-height:1.08;margin:0 0 8px;letter-spacing:-1.2px;font-weight:800}
 .page-heading p{margin:0;color:var(--mut);font-size:14px;max-width:650px}
@@ -136,28 +132,34 @@ tbody tr:hover{background:rgba(128,128,128,.025)}
 .modal-footer{display:flex;justify-content:flex-end;gap:9px;padding:12px 18px;border-top:1px solid var(--line)}
 .toast{position:fixed;bottom:18px;right:18px;z-index:20;background:var(--ink);color:var(--bg);border-radius:8px;padding:11px 14px;max-width:min(440px,calc(100vw - 36px));font-size:13px}
 .hidden{display:none!important}
+.admin-footer{border-top:1px solid var(--line);padding:22px 0;color:var(--mut);font-size:13px;margin-top:24px}
 @media(max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){
- .topbar-inner{padding:0 12px;min-height:58px}
+ .shop-header-inner{height:58px}
  .store-brand{font-size:18px;gap:7px}
  .admin-email{display:none}
  .top-actions{gap:5px}
- .top-actions .btn{font-size:12px;padding:6px 8px}
- .nav-inner{padding:9px 12px;gap:6px}
+ .cartbtn,.signout-btn{font-size:12px;padding:7px 8px}
+ .admin-nav{margin:12px 0 17px;padding:8px;gap:5px}
+ .nav{gap:5px}
  .nav button{padding:7px 10px;font-size:12px}
  .setup-link{margin-left:0}
- .page{padding:22px 12px 35px}
+ .page{padding:0 0 35px}
  .page-heading{align-items:flex-start}
  .page-heading .btn{white-space:normal}
  .order-main{grid-template-columns:1fr;gap:12px}
  .quick-grid{grid-template-columns:1fr}
 }
 @media(max-width:470px){
- .topbar-inner{gap:7px}
+ .w{padding-left:12px;padding-right:12px}
+ .shop-header-inner{gap:7px}
  .store-brand{font-size:16px;gap:5px}
  .admin-label{font-size:9px;padding:2px 4px}
  .top-actions{gap:4px}
- .top-actions .btn{padding:6px 7px;font-size:11px}
+ .cartbtn,.signout-btn{padding:6px 7px;font-size:11px}
+ .admin-nav{padding:7px;gap:3px}
+ .nav{gap:3px}
+ .nav button{padding:6px 8px;font-size:11px}
  .stats{gap:8px}
  .stat{padding:12px}
  .stat-value{font-size:22px}
@@ -206,19 +208,19 @@ function setToast(message) {
   state.toastTimer = setTimeout(() => node.classList.add("hidden"), 3200);
 }
 function renderLogin(error) {
-  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="brand" href="./index.html"><span class="brand-mark">🔩</span><span>Bolt<b>House</b> <span class="muted">Admin</span></span></a><h1 style="font-size:25px;margin:27px 0 6px">Welcome back</h1><p class="muted" style="margin:0 0 20px">Sign in with your administrator account to manage the store.</p>' +
+  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><h1 style="font-size:25px;margin:27px 0 6px">Welcome back</h1><p class="muted" style="margin:0 0 20px">Sign in with your administrator account to manage the store.</p>' +
     (error ? '<div class="error" role="alert">' + esc(error) + '</div>' : '') +
     '<form id="login-form"><div class="field"><label for="login-email">EMAIL</label><input id="login-email" type="email" autocomplete="username" required placeholder="you@example.com"></div><div class="field"><label for="login-password">PASSWORD</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Enter your password"></div><button id="login-submit" class="btn btn-primary btn-block" type="submit" style="margin-top:10px">Sign in to dashboard</button></form><p class="muted small" style="margin:20px 0 0"><a href="./index.html">← Return to storefront</a></p></section></main>';
 }
 function renderDenied() {
-  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="brand" href="./index.html"><span class="brand-mark">🔩</span><span>Bolt<b>House</b> Admin</span></a><h1 style="font-size:24px">Administrator access required</h1><p class="muted">This account is not marked as an administrator. Sign out and use the owner account.</p><button class="btn btn-primary btn-block" data-action="logout">Sign out</button><p><a href="./index.html">Return to storefront</a></p></section></main>';
+  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><h1 style="font-size:24px">Administrator access required</h1><p class="muted">This account is not marked as an administrator. Sign out and use the owner account.</p><button class="btn btn-primary btn-block" data-action="logout">Sign out</button><p><a href="./index.html">Return to storefront</a></p></section></main>';
 }
 function renderShell() {
   const email = state.auth && state.auth.user && state.auth.user.email ? state.auth.user.email : "Administrator";
-  const nav = [{id:"overview",icon:"▦",label:"Overview"},{id:"products",icon:"◇",label:"Products"},{id:"orders",icon:"▤",label:"Orders"},{id:"settings",icon:"⚙",label:"Store settings"}];
-  $("root").innerHTML = '<div class="admin-layout"><header class="topbar"><div class="topbar-inner"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><div class="top-actions"><span class="admin-email">' + esc(email) + '</span><a class="btn btn-soft" href="./index.html">View store ↗</a><button class="btn btn-soft" data-action="logout">Sign out</button></div></div></header>' +
-    '<div class="nav-shell"><nav class="nav nav-inner">' + nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '"><span class="nav-icon">' + item.icon + '</span><span>' + item.label + '</span></button>').join("") + '<a class="setup-link" href="./admin-policies.sql" target="_blank" rel="noopener">Database setup ↗</a></nav></div>' +
-    '<main class="main"><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main></div>';
+  const nav = [{id:"overview",label:"Overview"},{id:"products",label:"Products"},{id:"orders",label:"Orders"},{id:"settings",label:"Store settings"}];
+  $("root").innerHTML = '<div class="admin-layout"><header class="shop-header"><div class="w shop-header-inner"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><div class="top-actions"><span class="admin-email">' + esc(email) + '</span><a class="cartbtn" href="./index.html">View store ↗</a><button class="signout-btn" data-action="logout">Sign out</button></div></div></header><main class="w main"><nav class="admin-nav"><div class="nav">' +
+    nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '">' + item.label + '</button>').join("") +
+    '</div><a class="setup-link" href="./admin-policies.sql" target="_blank" rel="noopener">Database setup ↗</a></nav><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main><footer class="admin-footer"><div class="w">© BoltHouse · Store management</div></footer></div>';
 }
 function setPageTitle(title) {
   const node = $("top-title");
