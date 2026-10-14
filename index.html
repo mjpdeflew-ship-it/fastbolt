@@ -105,8 +105,8 @@ ROWS=rows;CATS={};ROWS.forEach(r=>{const a=CATS[r[0]]=CATS[r[0]]||[];if(!a.inclu
 SZ=[...new Set(ROWS.map(r=>r[2]))].sort((a,b)=>a-b);
 LN=[...new Set(ROWS.map(r=>r[3]).filter(Boolean))].sort((a,b)=>a-b);
 ITEMS=ROWS.map((r,index)=>{const material=r[5]==="stainless_steel"?"stainless_steel":"steel";const base=(r[1]+"_"+r[2]+"_"+r[3]).replace(/\W/g,"_");return {id:base,base,index,c:r[0],t:r[1],d:r[2],l:r[3],p:r[4],m:material}});
-const baseCounts=ITEMS.reduce((a,i)=>(a[i.base]=(a[i.base]||0)+1,a),{});
-ITEMS=ITEMS.map(i=>({...i,id:(baseCounts[i.base]>1?(i.c+"_"+i.base+"_"+i.index):i.base)+(i.m==="steel"?"":"_"+i.m)}));
+const idCounts=ITEMS.reduce((a,i)=>(a[i.id]=(a[i.id]||0)+1,a),{});
+ITEMS=ITEMS.map(i=>({...i,id:(idCounts[i.id]>1?(i.c+"_"+i.base+"_"+i.index)+(i.m==="steel"?"":"_"+i.m):i.id)}));
 byId=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
 }
 async function loadCatalog(){
