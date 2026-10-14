@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Secure BoltHouse owner dashboard for managing the product catalogue, stock availability, and customer orders.">
 <meta name="theme-color" content="#f6f5f2">
 <title>BoltHouse Admin</title>
 <style>
@@ -229,7 +230,7 @@ tbody tr:hover{background:rgba(128,128,128,.025)}
 <body>
 <div id="root"><div class="loading-screen">Loading BoltHouse Admin…</div></div>
 <div id="modal-root" class="modal-root"></div>
-<script src="./config.js?v=5f34b5d"></script>
+<script src="./config.js?v=20261015-1"></script>
 <script type="module">
 import { CFG, api, fetchAll, session, login, logout } from "./api.js";
 
@@ -616,7 +617,7 @@ async function submitProductForm(form) {
   const data = {category,type,size,length:((category === "bolt" || category === "screw") && lengthRaw !== "") ? Number(lengthRaw) : null,price,in_stock:fd.get("in_stock") === "on"};
   if (state.materialSupported) data.material = String(fd.get("material") || "steel");
   const old = state.editing;
-  if (!["steel","stainless_steel"].includes(data.material)) { errorRoot.innerHTML = '<div class="error">Choose Steel or Stainless steel.</div>'; return; }
+  if (state.materialSupported && !["steel","stainless_steel"].includes(data.material)) { errorRoot.innerHTML = '<div class="error">Choose Steel or Stainless steel.</div>'; return; }
   if (!["bolt","screw","nut","washer"].includes(category)) { errorRoot.innerHTML = '<div class="error">Choose a valid category.</div>'; return; }
   if (!type || type.length > 80) { errorRoot.innerHTML = '<div class="error">Enter a product type (up to 80 characters).</div>'; $("product-type-field").focus(); return; }
   if (!Number.isSafeInteger(size) || size < 1 || size > 1000) { errorRoot.innerHTML = '<div class="error">Enter a valid metric size.</div>'; $("product-size-field").focus(); return; }
@@ -720,7 +721,12 @@ async function updateOrderStatus(select) {
 function exportOrders() {
   const rows = state.visibleOrders || [];
   const columns = ["ref","created_at","name","phone","address","total","status","items"];
-  const cell = value => '"' + String(value == null ? "" : (typeof value === "object" ? JSON.stringify(value) : value)).replace(/"/g,'""') + '"';
+  const cell = value => {
+    let text = String(value == null ? "" : (typeof value === "object" ? JSON.stringify(value) : value));
+    // Prevent spreadsheet formula execution when customers provide fields beginning with =, +, - or @.
+    if (/^[\u0000-\u0020]*[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g,'""') + '"';
+  };
   const csv = [columns.join(","), ...rows.map(order => columns.map(key => cell(order[key])).join(","))].join("\r\n");
   const blob = new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"});
   const url = URL.createObjectURL(blob);
@@ -730,7 +736,7 @@ function exportOrders() {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   setToast("Orders exported to CSV.");
 }
 function copyOrder(ref) {
@@ -805,8 +811,6 @@ document.addEventListener("change", async event => {
   if (event.target.id === "product-material-field") updateProductPreview();
   if (event.target.id === "product-stock-field") updateProductPreview();
   if (event.target.id === "order-status-filter") { state.orderStatus = event.target.value; renderOrderResults(); }
-  if (event.target.id === "product-category-field") syncProductForm();
-  if (event.target.id === "product-stock-field") updateProductPreview();
   if (event.target.matches("[data-order-status]")) await updateOrderStatus(event.target);
 });
 document.addEventListener("keydown", event => {
