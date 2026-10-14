@@ -6,5 +6,5 @@
 window.BH_CONFIG = Object.freeze({
   SUPABASE_URL: "",       // e.g. https://YOUR_PROJECT_REF.supabase.co
   SUPABASE_ANON_KEY: "",  // Supabase publishable key (or legacy anon key)
-  WHATSAPP: ""             // Optional international number, digits recommended (e.g. 201xxxxxxxxx)
+  WHATSAPP: "201552155041" // International number, digits only
 });
