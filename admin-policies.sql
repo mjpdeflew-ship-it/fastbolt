@@ -50,9 +50,17 @@ USING (
 );
 
 -- Add order workflow status while keeping existing orders.
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'new';
+GRANT INSERT ON public.orders TO anon, authenticated;
 GRANT SELECT ON public.orders TO authenticated;
 GRANT UPDATE (status) ON public.orders TO authenticated;
+
+-- Customers must be able to submit orders from the storefront.
+DROP POLICY IF EXISTS "BoltHouse customers can submit orders" ON public.orders;
+CREATE POLICY "BoltHouse customers can submit orders"
+ON public.orders FOR INSERT TO anon, authenticated
+WITH CHECK (true);
 
 DROP POLICY IF EXISTS "BoltHouse admins can read orders" ON public.orders;
 CREATE POLICY "BoltHouse admins can read orders"
