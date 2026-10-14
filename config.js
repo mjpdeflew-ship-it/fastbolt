@@ -4,7 +4,7 @@
  * NEVER put a service_role key, database password, or other secret here.
  */
 window.BH_CONFIG = Object.freeze({
-  SUPABASE_URL: "",       // e.g. https://YOUR_PROJECT_REF.supabase.co
-  SUPABASE_ANON_KEY: "",  // Supabase publishable key (or legacy anon key)
-  WHATSAPP: "201552155041" // International number, digits only
+  SUPABASE_URL: "https://vhnbdokpxciiosrnbfsz.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_g98plMaQsT5_WYelq4sKsA_B0ej-CwU",
+  WHATSAPP: "201552155041"
 });
