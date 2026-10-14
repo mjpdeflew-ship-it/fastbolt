@@ -171,6 +171,57 @@ tbody tr:hover{background:rgba(128,128,128,.025)}
  .page-heading{flex-direction:column}
  .order-card{padding:12px}
 }
+
+/* Product form: clearer, guided workflow */
+.product-modal{width:min(680px,100%);border-radius:14px}
+.product-modal .modal-head{padding:20px 22px;align-items:flex-start}
+.product-modal .modal-head h2{font-size:22px;letter-spacing:-.5px}
+.modal-kicker{font-size:10px;font-weight:800;letter-spacing:.12em;color:var(--acc);margin-bottom:4px}
+.modal-subtitle{font-size:13px;color:var(--mut);margin:4px 0 0}
+.product-modal .modal-body{padding:20px 22px}
+.form-section{padding:0 0 19px;margin-bottom:19px;border-bottom:1px solid var(--line)}
+.form-section:last-of-type{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.form-section-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:12px}
+.form-step{display:grid;place-items:center;background:rgba(217,72,15,.09);color:var(--acc);width:29px;height:29px;flex:none;border-radius:8px;font-size:11px;font-weight:800}
+.form-section-head h3{font-size:14px;margin:0;font-weight:800}
+.form-section-head p{font-size:12px;color:var(--mut);margin:2px 0 0}
+.form-grid{gap:0 16px}
+.form-grid .field{margin:8px 0 10px}
+.field label{font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:700}
+.field-help{display:block;color:var(--mut);font-size:11px;line-height:1.4;margin-top:1px}
+.field-inline{display:flex;align-items:stretch;gap:0;min-width:0}
+.field-inline input{flex:1;width:100%;min-width:0;border-radius:8px 0 0 8px}
+.field-prefix,.field-unit{display:flex;align-items:center;justify-content:center;padding:0 12px;min-width:44px;border:1px solid var(--line);background:var(--bg);color:var(--mut);font-size:12px;font-weight:750}
+.field-prefix{border-right:0;border-radius:8px 0 0 8px}
+.field-prefix+input{border-radius:0 8px 8px 0}
+.field-inline input:not(:first-child):not(:last-child){border-radius:0}
+.field-unit{border-left:0;border-radius:0 8px 8px 0}
+.price-stock-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1fr);gap:14px;align-items:center}
+.price-field{margin:0}
+.price-field .field-inline input{font-weight:750;font-size:16px}
+.availability-card{border:1px solid var(--line);border-radius:9px;padding:12px;background:var(--bg)}
+.checkbox-field{margin:0;align-items:center;font-size:13px;line-height:1.35}
+.checkbox-field input{flex:none}
+.availability-help{padding-left:26px;font-size:11px;color:var(--mut);margin:5px 0 0}
+.product-preview{border:1px solid var(--line);border-radius:10px;padding:13px 14px;margin-top:17px;background:var(--bg)}
+.preview-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--mut);font-size:11px;font-weight:750;margin-bottom:10px}
+.preview-item{display:flex;align-items:center;gap:11px;min-width:0}
+.preview-icon{display:grid;place-items:center;flex:none;width:42px;height:42px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:21px}
+.preview-info{min-width:0;flex:1}
+.preview-name{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.preview-meta{font-size:11px;color:var(--mut);margin-top:2px}
+.preview-price{font-size:13px;font-weight:800;white-space:nowrap;text-align:right}
+.product-modal .modal-footer{position:sticky;bottom:0;background:var(--card);padding:13px 22px}
+.product-modal .modal-footer .btn{min-width:112px}
+@media(max-width:560px){
+ .product-modal .modal-head{padding:16px}
+ .product-modal .modal-body{padding:15px 16px}
+ .product-modal .modal-head h2{font-size:20px}
+ .price-stock-row{grid-template-columns:1fr;gap:8px}
+ .product-modal .modal-footer{padding:12px 16px}
+ .product-modal .modal-footer .btn{flex:1;min-width:0}
+ .preview-price{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -456,11 +507,78 @@ function renderProductResults() {
     return '<tr><td><div class="product-name">' + esc(label) + '</div><div class="product-sub">' + (p.length == null ? "No length" : esc(p.length + " mm")) + '</div></td><td>' + esc(categoryLabel(p.category)) + '</td><td>M' + esc(p.size) + '</td><td>' + (p.length == null ? "—" : esc(p.length + " mm")) + '</td><td><strong>' + money(p.price) + '</strong></td><td><span class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></td><td><div class="actions"><button class="btn btn-soft btn-small" data-action="edit-product" data-index="' + index + '">Edit</button><button class="btn btn-danger btn-small" data-action="delete-product" data-index="' + index + '">Delete</button></div></td></tr>';
   }).join("") + '</tbody></table></div>';
 }
+function productTypeSuggestions(category) {
+  const common = {
+    bolt:["Hex Bolt","Socket Head Bolt","Carriage Bolt","Eye Bolt","Anchor Bolt"],
+    screw:["Pan Head Screw","Countersunk Screw","Wood Screw","Self-Tapping Screw","Machine Screw"],
+    nut:["Hex Nut","Lock Nut","Flange Nut","Wing Nut"],
+    washer:["Flat Washer","Spring Washer","Fender Washer","Lock Washer"]
+  };
+  const existing = state.products.filter(p => p.category === category).map(p => p.type).filter(Boolean);
+  return [...new Set([...(common[category] || []),...existing])].sort((a,b) => a.localeCompare(b));
+}
+function updateProductTypeOptions() {
+  const list = $("product-type-options");
+  const category = $("product-category-field")?.value || "bolt";
+  if (!list) return;
+  list.replaceChildren();
+  productTypeSuggestions(category).forEach(type => {
+    const option = document.createElement("option");
+    option.value = type;
+    list.appendChild(option);
+  });
+}
+function syncProductForm() {
+  const category = $("product-category-field")?.value || "bolt";
+  const usesLength = category === "bolt" || category === "screw";
+  const lengthWrap = $("product-length-wrap");
+  const lengthInput = $("product-length-field");
+  if (lengthWrap) lengthWrap.hidden = !usesLength;
+  if (!usesLength && lengthInput) lengthInput.value = "";
+  updateProductTypeOptions();
+  updateProductPreview();
+}
+function updateProductPreview() {
+  const type = $("product-type-field")?.value.trim() || "Product type";
+  const category = $("product-category-field")?.value || "bolt";
+  const size = $("product-size-field")?.value;
+  const length = $("product-length-field")?.value;
+  const priceRaw = $("product-price-field")?.value;
+  const price = priceRaw === "" ? null : Number(priceRaw);
+  const inStock = Boolean($("product-stock-field")?.checked);
+  const usesLength = category === "bolt" || category === "screw";
+  const label = type + (size ? " M" + size : " · size not set") + (usesLength && length ? " × " + length + " mm" : "");
+  const name = $("preview-product-name");
+  const meta = $("preview-product-meta");
+  const priceNode = $("preview-product-price");
+  const badge = $("preview-product-stock");
+  if (name) name.textContent = label;
+  if (meta) meta.textContent = categoryLabel(category) + (size ? " · Metric M" + size : "") + (usesLength && length ? " · " + length + " mm long" : "");
+  if (priceNode) priceNode.textContent = price !== null && Number.isFinite(price) && price >= 0 ? money(price) : "Price not set";
+  if (badge) {
+    badge.textContent = inStock ? "In stock" : "Out of stock";
+    badge.className = "badge " + (inStock ? "stock" : "out");
+  }
+}
 function openProductForm(product) {
   state.editing = product || null;
   const p = product || {category:"bolt",type:"",size:"",length:"",price:"",in_stock:true};
-  $("modal-root").innerHTML = '<section class="modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><form id="product-form"><div class="modal-head"><h2 id="product-modal-title">' + (product ? "Edit product" : "Add product") + '</h2><button type="button" class="modal-close" data-action="close-modal" aria-label="Close">×</button></div><div class="modal-body"><div id="product-form-error"></div><div class="form-grid"><div class="field"><label for="product-category-field">CATEGORY</label><select id="product-category-field" name="category" required><option value="bolt"' + (p.category === "bolt" ? " selected" : "") + '>Bolts</option><option value="screw"' + (p.category === "screw" ? " selected" : "") + '>Screws</option><option value="nut"' + (p.category === "nut" ? " selected" : "") + '>Nuts</option><option value="washer"' + (p.category === "washer" ? " selected" : "") + '>Washers</option></select></div><div class="field"><label for="product-type-field">PRODUCT TYPE</label><input id="product-type-field" name="type" maxlength="80" required value="' + esc(p.type) + '" placeholder="e.g. Hex Bolt"></div><div class="field"><label for="product-size-field">METRIC SIZE</label><input id="product-size-field" name="size" type="number" min="1" max="1000" step="1" required value="' + esc(p.size) + '" placeholder="e.g. 8"></div><div class="field"><label for="product-length-field">LENGTH (MM)</label><input id="product-length-field" name="length" type="number" min="1" max="10000" step="1" value="' + (p.length == null ? "" : esc(p.length)) + '" placeholder="Leave blank for nuts/washers"></div><div class="field wide"><label for="product-price-field">PRICE PER PIECE (EGP)</label><input id="product-price-field" name="price" type="number" min="0" max="100000000" step="0.01" required value="' + esc(p.price) + '" placeholder="0.00"></div></div><label class="checkbox-field"><input name="in_stock" type="checkbox"' + (p.in_stock ? " checked" : "") + '> Available for customers</label></div><div class="modal-footer"><button type="button" class="btn btn-soft" data-action="close-modal">Cancel</button><button id="product-save-button" type="submit" class="btn btn-primary">' + (product ? "Save changes" : "Create product") + '</button></div></form></section>';
+  $("modal-root").innerHTML = '<section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><form id="product-form">' +
+    '<div class="modal-head"><div><div class="modal-kicker">BOLTHOUSE CATALOGUE</div><h2 id="product-modal-title">' + (product ? "Edit product" : "Add a product") + '</h2><p class="modal-subtitle">' + (product ? "Update the details customers see in your shop." : "Add an item once. It will appear in your shop when it is in stock.") + '</p></div><button type="button" class="modal-close" data-action="close-modal" aria-label="Close">×</button></div>' +
+    '<div class="modal-body"><div id="product-form-error"></div>' +
+    '<section class="form-section"><div class="form-section-head"><span class="form-step">01</span><div><h3>Product details</h3><p>Choose a category and identify the exact fastener.</p></div></div><div class="form-grid">' +
+    '<div class="field"><label for="product-category-field">Category</label><select id="product-category-field" name="category" required><option value="bolt"' + (p.category === "bolt" ? " selected" : "") + '>Bolts</option><option value="screw"' + (p.category === "screw" ? " selected" : "") + '>Screws</option><option value="nut"' + (p.category === "nut" ? " selected" : "") + '>Nuts</option><option value="washer"' + (p.category === "washer" ? " selected" : "") + '>Washers</option></select><span class="field-help">Choose the product group.</span></div>' +
+    '<div class="field"><label for="product-type-field">Product type</label><input id="product-type-field" name="type" list="product-type-options" maxlength="80" required value="' + esc(p.type) + '" placeholder="e.g. Hex Bolt" autocomplete="off"><datalist id="product-type-options"></datalist><span class="field-help">Select a suggestion or type your own.</span></div>' +
+    '<div class="field"><label for="product-size-field">Metric size</label><div class="field-inline"><span class="field-prefix">M</span><input id="product-size-field" name="size" type="number" min="1" max="1000" step="1" required value="' + esc(p.size) + '" placeholder="8"></div><span class="field-help">For example, enter 8 for M8.</span></div>' +
+    '<div class="field" id="product-length-wrap"><label for="product-length-field">Length</label><div class="field-inline"><input id="product-length-field" name="length" type="number" min="1" max="10000" step="1" value="' + (p.length == null ? "" : esc(p.length)) + '" placeholder="30"><span class="field-unit">mm</span></div><span class="field-help">Length in millimetres. Not needed for nuts or washers.</span></div>' +
+    '</div></section>' +
+    '<section class="form-section"><div class="form-section-head"><span class="form-step">02</span><div><h3>Price & availability</h3><p>Set the selling price and whether customers can order it.</p></div></div>' +
+    '<div class="price-stock-row"><div class="field price-field"><label for="product-price-field">Price per piece</label><div class="field-inline"><input id="product-price-field" name="price" type="number" min="0" max="100000000" step="0.01" required value="' + esc(p.price) + '" placeholder="0.00"><span class="field-unit">EGP</span></div><span class="field-help">Price for one item.</span></div>' +
+    '<div class="availability-card"><label class="checkbox-field"><input id="product-stock-field" name="in_stock" type="checkbox"' + (p.in_stock ? " checked" : "") + '> Available for customers</label><p class="availability-help">Turn off to hide it from the storefront without deleting it.</p></div></div></section>' +
+    '<section class="product-preview" aria-live="polite"><div class="preview-heading"><span>STOREFRONT PREVIEW</span><span id="preview-product-stock" class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></div><div class="preview-item"><div class="preview-icon">🔩</div><div class="preview-info"><div id="preview-product-name" class="preview-name"></div><div id="preview-product-meta" class="preview-meta"></div></div><div id="preview-product-price" class="preview-price"></div></div></section>' +
+    '</div><div class="modal-footer"><button type="button" class="btn btn-soft" data-action="close-modal">Cancel</button><button id="product-save-button" type="submit" class="btn btn-primary">' + (product ? "Save changes" : "＋ Create product") + '</button></div></form></section>';
   $("modal-root").classList.add("open");
+  syncProductForm();
   $("product-type-field").focus();
 }
 function closeModal() {
@@ -477,7 +595,7 @@ async function submitProductForm(form) {
   const size = Number(fd.get("size"));
   const lengthRaw = String(fd.get("length") || "").trim();
   const price = Number(fd.get("price"));
-  const data = {category,type,size,length:lengthRaw === "" ? null : Number(lengthRaw),price,in_stock:fd.get("in_stock") === "on"};
+  const data = {category,type,size,length:((category === "bolt" || category === "screw") && lengthRaw !== "") ? Number(lengthRaw) : null,price,in_stock:fd.get("in_stock") === "on"};
   const old = state.editing;
   if (!["bolt","screw","nut","washer"].includes(category)) { errorRoot.innerHTML = '<div class="error">Choose a valid category.</div>'; return; }
   if (!type || type.length > 80) { errorRoot.innerHTML = '<div class="error">Enter a product type (up to 80 characters).</div>'; $("product-type-field").focus(); return; }
@@ -658,10 +776,13 @@ document.addEventListener("submit", async event => {
 document.addEventListener("input", event => {
   if (event.target.id === "product-search") { state.productSearch = event.target.value; renderProductResults(); }
   if (event.target.id === "order-search") { state.orderSearch = event.target.value; renderOrderResults(); }
+  if (["product-type-field","product-size-field","product-length-field","product-price-field"].includes(event.target.id)) updateProductPreview();
 });
 document.addEventListener("change", async event => {
   if (event.target.id === "product-category") { state.productCategory = event.target.value; renderProductResults(); }
   if (event.target.id === "order-status-filter") { state.orderStatus = event.target.value; renderOrderResults(); }
+  if (event.target.id === "product-category-field") syncProductForm();
+  if (event.target.id === "product-stock-field") updateProductPreview();
   if (event.target.matches("[data-order-status]")) await updateOrderStatus(event.target);
 });
 document.addEventListener("keydown", event => {
