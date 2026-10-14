@@ -304,7 +304,7 @@ async function saveSettingsForm(form) {
     perk_one:String(fd.get("perk_one") || "").trim(),
     perk_two:String(fd.get("perk_two") || "").trim(),
     perk_three:String(fd.get("perk_three") || "").trim(),
-    whatsapp:String(fd.get("whatsapp") || "").replace(/\\D/g,"")
+    whatsapp:String(fd.get("whatsapp") || "").replace(/\D/g,"")
   };
   const bounds = [["store_name",80],["hero_title",160],["hero_description",300],["perk_one",60],["perk_two",60],["perk_three",60]];
   for (const item of bounds) {
