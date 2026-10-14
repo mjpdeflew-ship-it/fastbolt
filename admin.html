@@ -222,6 +222,8 @@ tbody tr:hover{background:rgba(128,128,128,.025)}
  .product-modal .modal-footer .btn{flex:1;min-width:0}
  .preview-price{font-size:12px}
 }
+
+.material-label{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-size:11px;font-weight:700;background:var(--bg);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -237,7 +239,7 @@ const money = value => Number(value || 0).toLocaleString("en-US",{minimumFractio
 const pretty = value => String(value || "").replace(/^./, ch => ch.toUpperCase());
 const dateText = value => value ? new Date(value).toLocaleString() : "Date unavailable";
 const statuses = ["new","confirmed","processing","completed","cancelled"];
-const state = { route:"overview", auth:null, products:[], orders:[], settings:null, visibleOrders:[], productSearch:"", productCategory:"all", orderSearch:"", orderStatus:"all", ordersStatusSupported:true, productError:"", ordersError:"", settingsError:"", editing:null, toastTimer:null };
+const state = { route:"overview", auth:null, products:[], orders:[], settings:null, visibleOrders:[], productSearch:"", productCategory:"all", productMaterial:"all", materialSupported:true, orderSearch:"", orderStatus:"all", ordersStatusSupported:true, productError:"", ordersError:"", settingsError:"", editing:null, toastTimer:null };
 
 function isAdmin(auth) {
   const meta = auth && auth.user && auth.user.app_metadata ? auth.user.app_metadata : {};
@@ -297,9 +299,17 @@ async function start() {
 }
 async function loadProductsData() {
   state.productError = "";
+  state.materialSupported = true;
   try {
-    const rows = await fetchAll("products?select=category,type,size,length,price,in_stock&order=category,type,size,length");
-    state.products = rows;
+    let rows;
+    try {
+      rows = await fetchAll("products?select=category,type,size,length,price,in_stock,material&order=category,type,size,length,material");
+    } catch (materialError) {
+      state.materialSupported = false;
+      rows = await fetchAll("products?select=category,type,size,length,price,in_stock&order=category,type,size,length");
+      rows = rows.map(product => ({...product,material:"steel"}));
+    }
+    state.products = rows.map(product => ({...product,material:product.material === "stainless_steel" ? "stainless_steel" : "steel"}));
     return true;
   } catch (error) {
     state.productError = error && error.message ? error.message : "Could not load products.";
@@ -462,10 +472,11 @@ function renderOverview() {
     '<p class="small muted" style="margin-top:16px">Manage catalogue details and orders here. Storefront products update from the shared database.</p>';
 }
 function productKey(product) {
-  return "category=eq." + encodeURIComponent(product.category) + "&type=eq." + encodeURIComponent(product.type) + "&size=eq." + encodeURIComponent(product.size) + "&length=" + (product.length == null ? "is.null" : "eq." + encodeURIComponent(product.length));
+  const base = "category=eq." + encodeURIComponent(product.category) + "&type=eq." + encodeURIComponent(product.type) + "&size=eq." + encodeURIComponent(product.size) + "&length=" + (product.length == null ? "is.null" : "eq." + encodeURIComponent(product.length));
+  return state.materialSupported ? base + "&material=eq." + encodeURIComponent(product.material || "steel") : base;
 }
 function sameProductKey(a,b) {
-  return a.category === b.category && a.type.trim().toLowerCase() === b.type.trim().toLowerCase() && Number(a.size) === Number(b.size) && (a.length == null ? null : Number(a.length)) === (b.length == null ? null : Number(b.length));
+  return a.category === b.category && a.type.trim().toLowerCase() === b.type.trim().toLowerCase() && Number(a.size) === Number(b.size) && (a.length == null ? null : Number(a.length)) === (b.length == null ? null : Number(b.length)) && (!state.materialSupported || (a.material || "steel") === (b.material || "steel"));
 }
 function categoryLabel(value) {
   return ({bolt:"Bolts",screw:"Screws",nut:"Nuts",washer:"Washers"})[value] || pretty(value);
@@ -475,17 +486,21 @@ function filteredProducts() {
   return state.products.map((product,index) => ({product,index})).filter(item => {
     const p = item.product;
     const matchesCategory = state.productCategory === "all" || p.category === state.productCategory;
-    const text = [p.type,p.category,p.size,p.length,p.price].join(" ").toLowerCase();
-    return matchesCategory && (!search || text.includes(search));
+    const matchesMaterial = state.productMaterial === "all" || (p.material || "steel") === state.productMaterial;
+    const materialText = (p.material || "steel") === "stainless_steel" ? "stainless steel" : "steel";
+    const text = [p.type,p.category,p.size,p.length,p.price,materialText].join(" ").toLowerCase();
+    return matchesCategory && matchesMaterial && (!search || text.includes(search));
   });
 }
 function renderProducts() {
   const page = $("page");
   const categories = ["all","bolt","screw","nut","washer"];
+  const materialOptions = '<option value="all"' + (state.productMaterial === "all" ? " selected" : "") + '>All materials</option><option value="steel"' + (state.productMaterial === "steel" ? " selected" : "") + '>Steel</option><option value="stainless_steel"' + (state.productMaterial === "stainless_steel" ? " selected" : "") + '>Stainless steel</option>';
   page.innerHTML = pageHeading("Products","Add, edit, price, stock, or remove products in your catalogue.",'<button class="btn btn-primary" data-action="add-product">＋ Add product</button>') +
     errorBox(state.productError) +
-    '<section class="panel"><div class="panel-head"><h2>Product catalogue</h2><button class="btn btn-soft btn-small" data-action="refresh">↻ Refresh</button></div><div class="panel-body"><div class="toolbar"><input class="search" id="product-search" value="' + esc(state.productSearch) + '" placeholder="Search name, category, size…" aria-label="Search products"><select class="category-filter" id="product-category" aria-label="Filter by category">' + categories.map(c => '<option value="' + c + '"' + (state.productCategory === c ? " selected" : "") + '>' + (c === "all" ? "All categories" : categoryLabel(c)) + '</option>').join("") + '</select><span class="results-count" id="product-count"></span></div><div id="product-results"></div></div></section>' +
-    '<div class="notice">Changes apply to the customer catalogue. Out-of-stock items remain visible here but are hidden from shoppers. Full edit and delete permissions may require the <a href="./admin-policies.sql" target="_blank" rel="noopener">one-time database setup</a>.</div>';
+    (!state.materialSupported ? '<div class="notice">The material column is not installed yet. Run the <a href="./admin-policies.sql" target="_blank" rel="noopener">database setup SQL</a> to activate Steel and Stainless steel controls. Existing products are temporarily treated as Steel.</div>' : '') +
+    '<section class="panel"><div class="panel-head"><h2>Product catalogue</h2><button class="btn btn-soft btn-small" data-action="refresh">↻ Refresh</button></div><div class="panel-body"><div class="toolbar"><input class="search" id="product-search" value="' + esc(state.productSearch) + '" placeholder="Search name, material, size…" aria-label="Search products"><select class="category-filter" id="product-category" aria-label="Filter by category">' + categories.map(c => '<option value="' + c + '"' + (state.productCategory === c ? " selected" : "") + '>' + (c === "all" ? "All categories" : categoryLabel(c)) + '</option>').join("") + '</select><select class="category-filter" id="product-material" aria-label="Filter by material"' + (state.materialSupported ? "" : " disabled") + '>' + materialOptions + '</select><span class="results-count" id="product-count"></span></div><div id="product-results"></div></div></section>' +
+    '<div class="notice">Changes apply to the customer catalogue. Out-of-stock items remain visible here but are hidden from shoppers. Product material is stored in the database and used by the storefront filter.</div>';
   renderProductResults();
 }
 function renderProductResults() {
@@ -502,9 +517,10 @@ function renderProductResults() {
     target.innerHTML = emptyState("◇",state.products.length ? "No matching products" : "No products yet",state.products.length ? "Try another search or category." : "Use Add product to create the first catalogue item.");
     return;
   }
-  target.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Size</th><th>Length</th><th>Price / piece</th><th>Availability</th><th>Actions</th></tr></thead><tbody>' + rows.map(({product:p,index}) => {
+  target.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Material</th><th>Size</th><th>Length</th><th>Price / piece</th><th>Availability</th><th>Actions</th></tr></thead><tbody>' + rows.map(({product:p,index}) => {
     const label = (p.type || p.category) + " M" + p.size;
-    return '<tr><td><div class="product-name">' + esc(label) + '</div><div class="product-sub">' + (p.length == null ? "No length" : esc(p.length + " mm")) + '</div></td><td>' + esc(categoryLabel(p.category)) + '</td><td>M' + esc(p.size) + '</td><td>' + (p.length == null ? "—" : esc(p.length + " mm")) + '</td><td><strong>' + money(p.price) + '</strong></td><td><span class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></td><td><div class="actions"><button class="btn btn-soft btn-small" data-action="edit-product" data-index="' + index + '">Edit</button><button class="btn btn-danger btn-small" data-action="delete-product" data-index="' + index + '">Delete</button></div></td></tr>';
+    const materialLabel = (p.material || "steel") === "stainless_steel" ? "Stainless steel" : "Steel";
+    return '<tr><td><div class="product-name">' + esc(label) + '</div><div class="product-sub">' + (p.length == null ? "No length" : esc(p.length + " mm")) + '</div></td><td>' + esc(categoryLabel(p.category)) + '</td><td><span class="material-label">' + esc(materialLabel) + '</span></td><td>M' + esc(p.size) + '</td><td>' + (p.length == null ? "—" : esc(p.length + " mm")) + '</td><td><strong>' + money(p.price) + '</strong></td><td><span class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></td><td><div class="actions"><button class="btn btn-soft btn-small" data-action="edit-product" data-index="' + index + '">Edit</button><button class="btn btn-danger btn-small" data-action="delete-product" data-index="' + index + '">Delete</button></div></td></tr>';
   }).join("") + '</tbody></table></div>';
 }
 function productTypeSuggestions(category) {
@@ -553,7 +569,8 @@ function updateProductPreview() {
   const priceNode = $("preview-product-price");
   const badge = $("preview-product-stock");
   if (name) name.textContent = label;
-  if (meta) meta.textContent = categoryLabel(category) + (size ? " · Metric M" + size : "") + (usesLength && length ? " · " + length + " mm long" : "");
+  const material = $("product-material-field")?.value || "steel";
+  if (meta) meta.textContent = categoryLabel(category) + " · " + (material === "stainless_steel" ? "Stainless steel" : "Steel") + (size ? " · Metric M" + size : "") + (usesLength && length ? " · " + length + " mm long" : "");
   if (priceNode) priceNode.textContent = price !== null && Number.isFinite(price) && price >= 0 ? money(price) : "Price not set";
   if (badge) {
     badge.textContent = inStock ? "In stock" : "Out of stock";
@@ -562,13 +579,14 @@ function updateProductPreview() {
 }
 function openProductForm(product) {
   state.editing = product || null;
-  const p = product || {category:"bolt",type:"",size:"",length:"",price:"",in_stock:true};
+  const p = product || {category:"bolt",type:"",material:"steel",size:"",length:"",price:"",in_stock:true};
   $("modal-root").innerHTML = '<section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><form id="product-form">' +
     '<div class="modal-head"><div><div class="modal-kicker">BOLTHOUSE CATALOGUE</div><h2 id="product-modal-title">' + (product ? "Edit product" : "Add a product") + '</h2><p class="modal-subtitle">' + (product ? "Update the details customers see in your shop." : "Add an item once. It will appear in your shop when it is in stock.") + '</p></div><button type="button" class="modal-close" data-action="close-modal" aria-label="Close">×</button></div>' +
     '<div class="modal-body"><div id="product-form-error"></div>' +
     '<section class="form-section"><div class="form-section-head"><span class="form-step">01</span><div><h3>Product details</h3><p>Choose a category and identify the exact fastener.</p></div></div><div class="form-grid">' +
     '<div class="field"><label for="product-category-field">Category</label><select id="product-category-field" name="category" required><option value="bolt"' + (p.category === "bolt" ? " selected" : "") + '>Bolts</option><option value="screw"' + (p.category === "screw" ? " selected" : "") + '>Screws</option><option value="nut"' + (p.category === "nut" ? " selected" : "") + '>Nuts</option><option value="washer"' + (p.category === "washer" ? " selected" : "") + '>Washers</option></select><span class="field-help">Choose the product group.</span></div>' +
     '<div class="field"><label for="product-type-field">Product type</label><input id="product-type-field" name="type" list="product-type-options" maxlength="80" required value="' + esc(p.type) + '" placeholder="e.g. Hex Bolt" autocomplete="off"><datalist id="product-type-options"></datalist><span class="field-help">Select a suggestion or type your own.</span></div>' +
+    '<div class="field"><label for="product-material-field">Material</label><select id="product-material-field" name="material" required' + (state.materialSupported ? '' : ' disabled') + '><option value="steel"' + ((p.material || "steel") === "steel" ? " selected" : "") + '>Steel</option><option value="stainless_steel"' + (p.material === "stainless_steel" ? " selected" : "") + '>Stainless steel</option></select><span class="field-help">' + (state.materialSupported ? 'Choose standard steel or corrosion-resistant stainless steel.' : 'Run the database setup SQL to enable material selection.') + '</span></div>' +
     '<div class="field"><label for="product-size-field">Metric size</label><div class="field-inline"><span class="field-prefix">M</span><input id="product-size-field" name="size" type="number" min="1" max="1000" step="1" required value="' + esc(p.size) + '" placeholder="8"></div><span class="field-help">For example, enter 8 for M8.</span></div>' +
     '<div class="field" id="product-length-wrap"><label for="product-length-field">Length</label><div class="field-inline"><input id="product-length-field" name="length" type="number" min="1" max="10000" step="1" value="' + (p.length == null ? "" : esc(p.length)) + '" placeholder="30"><span class="field-unit">mm</span></div><span class="field-help">Length in millimetres. Not needed for nuts or washers.</span></div>' +
     '</div></section>' +
@@ -596,7 +614,9 @@ async function submitProductForm(form) {
   const lengthRaw = String(fd.get("length") || "").trim();
   const price = Number(fd.get("price"));
   const data = {category,type,size,length:((category === "bolt" || category === "screw") && lengthRaw !== "") ? Number(lengthRaw) : null,price,in_stock:fd.get("in_stock") === "on"};
+  if (state.materialSupported) data.material = String(fd.get("material") || "steel"); else data.material = old?.material || "steel";
   const old = state.editing;
+  if (!["steel","stainless_steel"].includes(data.material)) { errorRoot.innerHTML = '<div class="error">Choose Steel or Stainless steel.</div>'; return; }
   if (!["bolt","screw","nut","washer"].includes(category)) { errorRoot.innerHTML = '<div class="error">Choose a valid category.</div>'; return; }
   if (!type || type.length > 80) { errorRoot.innerHTML = '<div class="error">Enter a product type (up to 80 characters).</div>'; $("product-type-field").focus(); return; }
   if (!Number.isSafeInteger(size) || size < 1 || size > 1000) { errorRoot.innerHTML = '<div class="error">Enter a valid metric size.</div>'; $("product-size-field").focus(); return; }
@@ -780,6 +800,10 @@ document.addEventListener("input", event => {
 });
 document.addEventListener("change", async event => {
   if (event.target.id === "product-category") { state.productCategory = event.target.value; renderProductResults(); }
+  if (event.target.id === "product-material") { state.productMaterial = event.target.value; renderProductResults(); }
+  if (event.target.id === "product-category-field") syncProductForm();
+  if (event.target.id === "product-material-field") updateProductPreview();
+  if (event.target.id === "product-stock-field") updateProductPreview();
   if (event.target.id === "order-status-filter") { state.orderStatus = event.target.value; renderOrderResults(); }
   if (event.target.id === "product-category-field") syncProductForm();
   if (event.target.id === "product-stock-field") updateProductPreview();
