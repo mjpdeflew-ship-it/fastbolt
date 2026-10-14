@@ -65,11 +65,25 @@ async function loadProducts() {
     const rows = await api("products?select=category,type,size,length,price,in_stock&order=category,type,size,length", { method: "GET" });
     if (!Array.isArray(rows)) throw new Error("Unexpected products response.");
     productRows = rows;
-    if (!rows.length) {
-      root.innerHTML = `<p class="empty">No products found.</p>`;
-      return;
-    }
-    root.innerHTML = `<p class="meta">Edit a price or availability, then press Save on that product.</p>` + rows.map((p, i) => {
+    root.innerHTML = `<button class="go" data-admin="show-add-product" style="margin:8px 0">+ Add product</button>
+      <div id="add-product-form" hidden style="border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0">
+        <h3 style="margin:0 0 8px">Add a product</h3>
+        <div class="f">
+          <label for="new-category">Category</label>
+          <select id="new-category"><option value="bolt">Bolts</option><option value="screw">Screws</option><option value="nut">Nuts</option><option value="washer">Washers</option></select>
+          <label for="new-type">Product type</label>
+          <input id="new-type" maxlength="80" placeholder="e.g. Hex Bolt" required>
+          <label for="new-size">Metric size (number only)</label>
+          <input id="new-size" type="number" min="1" max="1000" step="1" placeholder="e.g. 8" required>
+          <label for="new-length">Length in mm (leave empty for nuts/washers)</label>
+          <input id="new-length" type="number" min="1" max="10000" step="1" placeholder="e.g. 30">
+          <label for="new-price">Price per piece (EGP)</label>
+          <input id="new-price" type="number" min="0" max="100000000" step="0.01" placeholder="e.g. 5.00" required>
+          <label style="display:flex;align-items:center;gap:8px"><input id="new-stock" type="checkbox" checked> In stock</label>
+          <button class="go" data-admin="create-product">Save new product</button>
+        </div>
+      </div>
+      <p class="meta">Edit a price or availability, then press Save on that product.</p>` + (rows.length ? rows.map((p, i) => {
       const label = `${p.type || p.category} M${p.size}${p.length == null ? "" : " × " + p.length + " mm"}`;
       return `<section class="it" style="display:block;margin:8px 0">
         <b>${esc(label)}</b>
@@ -81,7 +95,7 @@ async function loadProducts() {
           <button class="chip" data-admin="save-product" data-index="${i}">Save</button>
         </div>
       </section>`;
-    }).join("");
+    }).join("") : `<p class="empty">No products found yet. Use “Add product” above to create your first item.</p>`);
   } catch (error) {
     root.innerHTML = `<p class="empty">Products could not be loaded. Check that the products table exists and allows admins to read it.</p>`;
     err.textContent = error?.message || "Unable to load products.";
@@ -124,6 +138,42 @@ async function saveProduct(button, index) {
     button.textContent = "Retry";
   } finally {
     button.disabled = false;
+  }
+}
+
+async function createProduct(button) {
+  const err = get("admin-error");
+  const root = get("admin-content");
+  const category = get("new-category")?.value;
+  const type = get("new-type")?.value.trim();
+  const size = Number(get("new-size")?.value);
+  const lengthRaw = get("new-length")?.value.trim();
+  const price = Number(get("new-price")?.value);
+  const in_stock = Boolean(get("new-stock")?.checked);
+  const length = lengthRaw === "" ? null : Number(lengthRaw);
+  if (!["bolt", "screw", "nut", "washer"].includes(category)) {
+    err.textContent = "Choose a valid category."; return;
+  }
+  if (!type || type.length > 80) { err.textContent = "Enter the product type."; get("new-type")?.focus(); return; }
+  if (!Number.isSafeInteger(size) || size < 1 || size > 1000) { err.textContent = "Enter a valid metric size, for example 8."; get("new-size")?.focus(); return; }
+  if (length !== null && (!Number.isSafeInteger(length) || length < 1 || length > 10000)) { err.textContent = "Length must be a positive whole number in millimetres, or leave it empty."; get("new-length")?.focus(); return; }
+  if (!Number.isFinite(price) || price < 0 || price > 100000000) { err.textContent = "Enter a valid price in EGP."; get("new-price")?.focus(); return; }
+  button.disabled = true;
+  button.textContent = "Adding…";
+  err.textContent = "";
+  try {
+    await api("products", {
+      method: "POST",
+      body: { category, type, size, length, price, in_stock },
+      prefer: "return=minimal"
+    });
+    await loadProducts();
+    const e = get("admin-error");
+    if (e) e.textContent = "Product added successfully.";
+  } catch (error) {
+    err.textContent = `Could not add product: ${error?.message || "Unknown error"}. If you see 401/403, the admin INSERT policy is missing in Supabase.`;
+    button.disabled = false;
+    button.textContent = "Retry adding product";
   }
 }
 
@@ -177,6 +227,11 @@ function attachListener() {
       button.disabled = true;
       try { currentTab === "products" ? await loadProducts() : await loadOrders(); }
       finally { button.disabled = false; }
+    } else if (action === "show-add-product") {
+      const form = get("add-product-form");
+      if (form) form.hidden = !form.hidden;
+    } else if (action === "create-product") {
+      await createProduct(button);
     } else if (action === "save-product") {
       await saveProduct(button, Number(button.dataset.index));
     } else if (action === "logout") {
