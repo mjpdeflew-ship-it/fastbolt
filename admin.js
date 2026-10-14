@@ -5,6 +5,8 @@ const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({
 }[ch]));
 const money = value => `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP`;
 const get = id => document.getElementById(id);
+let currentTab = "products";
+let productRows = [];
 
 function show(html) {
   const overlay = get("ov");
@@ -15,7 +17,7 @@ function show(html) {
 }
 
 function isAdmin(auth) {
-  // This is only a convenient UI gate; Supabase RLS must enforce the same rule server-side.
+  // UI check only; Supabase RLS must enforce the same rule server-side.
   const meta = auth?.user?.app_metadata || {};
   return meta.role === "admin" || (Array.isArray(meta.roles) && meta.roles.includes("admin"));
 }
@@ -25,6 +27,14 @@ function shell(content) {
     <h2>BoltHouse Admin</h2>${content}`;
 }
 
+function tabs() {
+  return `<div class="fr" style="flex-wrap:wrap">
+    <button class="chip ${currentTab === "products" ? "on" : ""}" data-admin="products">Products</button>
+    <button class="chip ${currentTab === "orders" ? "on" : ""}" data-admin="orders">Orders</button>
+    <button class="chip" data-admin="logout">Sign out</button>
+  </div>`;
+}
+
 export async function start() {
   const auth = session();
   if (!auth) {
@@ -32,19 +42,94 @@ export async function start() {
     return;
   }
   if (!isAdmin(auth)) {
-    show(shell(`<p role="alert">This account is not marked as an administrator. Ask the project owner to grant the admin role securely in Supabase.</p>
+    show(shell(`<p role="alert">This account is not marked as an administrator. Sign in with your admin account.</p>
       <button class="go" data-admin="logout">Sign out</button>`));
     return;
   }
+  currentTab = "products";
   show(shell(`<p class="meta">Signed in as ${esc(auth.user?.email || "admin")}</p>
-    <div id="admin-error" role="alert" style="color:var(--acc)"></div>
-    <div class="fr"><button class="chip" data-admin="refresh">Refresh orders</button><button class="chip" data-admin="logout">Sign out</button></div>
-    <div id="admin-orders"><p class="empty">Loading orders…</p></div>`));
-  await loadOrders();
+    ${tabs()}
+    <div id="admin-error" role="alert" style="color:var(--acc);overflow-wrap:anywhere"></div>
+    <div id="admin-content"><p class="empty">Loading products…</p></div>`));
+  await loadProducts();
+}
+
+async function loadProducts() {
+  currentTab = "products";
+  const root = get("admin-content");
+  const err = get("admin-error");
+  if (!root || !err) return;
+  root.innerHTML = `<p class="empty">Loading products…</p>`;
+  err.textContent = "";
+  try {
+    const rows = await api("products?select=category,type,size,length,price,in_stock&order=category,type,size,length", { method: "GET" });
+    if (!Array.isArray(rows)) throw new Error("Unexpected products response.");
+    productRows = rows;
+    if (!rows.length) {
+      root.innerHTML = `<p class="empty">No products found.</p>`;
+      return;
+    }
+    root.innerHTML = `<p class="meta">Edit a price or availability, then press Save on that product.</p>` + rows.map((p, i) => {
+      const label = `${p.type || p.category} M${p.size}${p.length == null ? "" : " × " + p.length + " mm"}`;
+      return `<section class="it" style="display:block;margin:8px 0">
+        <b>${esc(label)}</b>
+        <div class="meta">${esc(p.category)} · ${p.length == null ? "No length" : esc(p.length + " mm")}</div>
+        <div class="fr" style="align-items:center;flex-wrap:wrap;margin-top:8px">
+          <label for="price-${i}" class="meta">Price (EGP)</label>
+          <input id="price-${i}" data-product-price="${i}" type="number" min="0" max="100000000" step="0.01" value="${esc(p.price)}" style="width:125px" aria-label="Price in EGP for ${esc(label)}">
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input data-product-stock="${i}" type="checkbox" ${p.in_stock ? "checked" : ""}> In stock</label>
+          <button class="chip" data-admin="save-product" data-index="${i}">Save</button>
+        </div>
+      </section>`;
+    }).join("");
+  } catch (error) {
+    root.innerHTML = `<p class="empty">Products could not be loaded. Check that the products table exists and allows admins to read it.</p>`;
+    err.textContent = error?.message || "Unable to load products.";
+  }
+}
+
+async function saveProduct(button, index) {
+  const p = productRows[index];
+  const err = get("admin-error");
+  if (!p || !err) return;
+  const priceInput = get(`price-${index}`);
+  const stockInput = document.querySelector(`[data-product-stock="${index}"]`);
+  const price = Number(priceInput?.value);
+  if (!Number.isFinite(price) || price < 0 || price > 100000000) {
+    err.textContent = "Enter a valid non-negative price.";
+    priceInput?.focus();
+    return;
+  }
+  const filter = [
+    `category=eq.${encodeURIComponent(p.category)}`,
+    `type=eq.${encodeURIComponent(p.type)}`,
+    `size=eq.${encodeURIComponent(p.size)}`,
+    p.length == null ? "length=is.null" : `length=eq.${encodeURIComponent(p.length)}`
+  ].join("&");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  err.textContent = "";
+  try {
+    await api(`products?${filter}`, {
+      method: "PATCH",
+      body: { price, in_stock: Boolean(stockInput?.checked) },
+      prefer: "return=minimal"
+    });
+    p.price = price;
+    p.in_stock = Boolean(stockInput?.checked);
+    button.textContent = "Saved ✓";
+    if (window.BH?.reload) await window.BH.reload();
+  } catch (error) {
+    err.textContent = `Could not save product: ${error?.message || "Unknown error"}. If this is a permission error, apply the admin products policy in Supabase.`;
+    button.textContent = "Retry";
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadOrders() {
-  const root = get("admin-orders");
+  currentTab = "orders";
+  const root = get("admin-content");
   const err = get("admin-error");
   if (!root || !err) return;
   root.innerHTML = `<p class="empty">Loading orders…</p>`;
@@ -84,14 +169,20 @@ function attachListener() {
     const action = button.dataset.admin;
     if (action === "close") {
       get("ov")?.classList.remove("open");
+    } else if (action === "products") {
+      await loadProducts();
+    } else if (action === "orders") {
+      await loadOrders();
     } else if (action === "refresh") {
       button.disabled = true;
-      try { await loadOrders(); }
+      try { currentTab === "products" ? await loadProducts() : await loadOrders(); }
       finally { button.disabled = false; }
+    } else if (action === "save-product") {
+      await saveProduct(button, Number(button.dataset.index));
     } else if (action === "logout") {
       button.disabled = true;
       try { await logout(); }
-      catch { /* Local session is cleared even if the remote logout endpoint fails. */ }
+      catch { /* Local session is cleared even if remote logout fails. */ }
       get("ov")?.classList.remove("open");
     }
   });
