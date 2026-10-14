@@ -137,7 +137,9 @@ END $cleanup$;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'new';
 REVOKE ALL ON public.orders FROM anon, authenticated, PUBLIC;
-GRANT INSERT ON public.orders TO anon, authenticated;
+-- Public checkout may submit only the order fields used by the storefront.
+-- In particular, customers cannot choose status or overwrite created_at.
+GRANT INSERT (ref, name, phone, address, items, total) ON public.orders TO anon, authenticated;
 GRANT SELECT ON public.orders TO authenticated;
 GRANT UPDATE (status) ON public.orders TO authenticated;
 
