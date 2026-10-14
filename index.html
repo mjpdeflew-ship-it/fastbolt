@@ -162,7 +162,7 @@ $("bar").innerHTML=row("c","Category",cats,v=>v[0].toUpperCase()+v.slice(1)+"s")
 function grid(){
 const L=ITEMS.filter(i=>has(F.c,i.c)&&has(F.t,i.t)&&has(F.s,i.d)&&has(F.l,i.l));
 $("cnt").textContent=L.length+" items";
-$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(CFG.WHATSAPP.replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
+$("grid").innerHTML=L.slice(0,shown).map(i=>`<div class="it">${ic(i)}<div class="nm"><b>${esc(i.t)} M${esc(i.d)}${i.l?"×"+esc(i.l):""}</b><div class="meta">Size M${esc(i.d)}${i.l?" · Length "+esc(i.l)+" mm":""}</div></div><div class="price">${fm(i.p)}<small>per piece</small></div><input class="qi" type="number" min="1" step="1" value="1" id="q${esc(i.id)}" aria-label="Quantity"><button class="add" data-a="${esc(i.id)}">Add</button></div>`).join("")||(LOADERR?'<div class="empty">The catalogue is not available right now. <a href="https://wa.me/'+esc(getWhatsapp().replace(/\D/g,""))+'?text='+encodeURIComponent("Hello " + getStoreName() + ", please send me the product catalogue.")+'" target="_blank" rel="noopener">Ask for the catalogue on WhatsApp</a>.</div>':'<div class="empty">No items match those filters.</div>');
 $("more").style.display=L.length>shown?"block":"none";
 }
 function drawer(view){
@@ -171,7 +171,7 @@ let h='<button class="x" data-c="close">×</button>';
 if(view=="co"){
 h+=`<h2>Checkout</h2><div class="f"><input id="nm" placeholder="Full name"><input id="ph" placeholder="Phone"><input id="ad" placeholder="Delivery address"></div><div class="tot"><span>Total</span><span>${fm(total())}</span></div><p id="er" style="color:var(--acc);margin:0"></p><button class="go" data-c="place">Place order</button>`;
 }else if(view=="done"){
-const wa=getWhatsapp()&&LAST?`<a class="go" style="display:block;text-align:center;text-decoration:none;border-radius:8px;margin-bottom:8px" target="_blank" rel="noopener" href="https://wa.me/${CFG.WHATSAPP.replace(/\D/g,"")}?text=${encodeURIComponent(waText(LAST))}">Send order on WhatsApp</a>`:"";
+const wa=getWhatsapp()&&LAST?`<a class="go" style="display:block;text-align:center;text-decoration:none;border-radius:8px;margin-bottom:8px" target="_blank" rel="noopener" href="https://wa.me/${getWhatsapp().replace(/\D/g,"")}?text=${encodeURIComponent(waText(LAST))}">Send order on WhatsApp</a>`:"";
 h+=`<h2 class="ok">Order ${ORDER_SAVED?"received":"ready"} ✓</h2><p>${ORDER_SAVED?"Thanks! We'll contact you to confirm delivery.":"Your order has not been submitted yet. Tap below to send it to us on WhatsApp."}</p>${wa}<button class="go" data-c="close">Keep shopping</button>`;
 }else{
 const e=Object.entries(cart);
