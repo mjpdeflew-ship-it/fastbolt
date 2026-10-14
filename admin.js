@@ -1,246 +1,585 @@
-import { CFG, api, session, logout } from "./api.js";
+import { CFG, api, fetchAll, session, login, logout } from "./api.js";
 
-const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-}[ch]));
-const money = value => `${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP`;
-const get = id => document.getElementById(id);
-let currentTab = "products";
-let productRows = [];
-
-function show(html) {
-  const overlay = get("ov");
-  const drawer = get("dr");
-  if (!overlay || !drawer) throw new Error("Admin panel could not find the storefront drawer.");
-  drawer.innerHTML = html;
-  overlay.classList.add("open");
-}
+const $ = id => document.getElementById(id);
+const esc = value => String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const money = value => Number(value || 0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) + " EGP";
+const pretty = value => String(value || "").replace(/^./, ch => ch.toUpperCase());
+const dateText = value => value ? new Date(value).toLocaleString() : "Date unavailable";
+const statuses = ["new","confirmed","processing","completed","cancelled"];
+const state = { route:"overview", auth:null, products:[], orders:[], settings:null, visibleOrders:[], productSearch:"", productCategory:"all", productMaterial:"all", materialSupported:true, orderSearch:"", orderStatus:"all", ordersStatusSupported:true, productError:"", ordersError:"", settingsError:"", editing:null, toastTimer:null };
 
 function isAdmin(auth) {
-  // UI check only; Supabase RLS must enforce the same rule server-side.
-  const meta = auth?.user?.app_metadata || {};
+  const meta = auth && auth.user && auth.user.app_metadata ? auth.user.app_metadata : {};
   return meta.role === "admin" || (Array.isArray(meta.roles) && meta.roles.includes("admin"));
 }
-
-function shell(content) {
-  return `<button class="x" data-admin="close" aria-label="Close admin">×</button>
-    <h2>BoltHouse Admin</h2>${content}`;
+function statusLabel(value) { return pretty(value || "new"); }
+function statusClass(value) { return "status-" + (statuses.includes(value) ? value : "new"); }
+function setToast(message) {
+  let node = $("toast");
+  if (!node) {
+    node = document.createElement("div");
+    node.id = "toast";
+    node.className = "toast";
+    document.body.appendChild(node);
+  }
+  node.textContent = message;
+  node.classList.remove("hidden");
+  if (state.toastTimer) clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => node.classList.add("hidden"), 3200);
 }
-
-function tabs() {
-  return `<div class="fr" style="flex-wrap:wrap">
-    <button class="chip ${currentTab === "products" ? "on" : ""}" data-admin="products">Products</button>
-    <button class="chip ${currentTab === "orders" ? "on" : ""}" data-admin="orders">Orders</button>
-    <button class="chip" data-admin="logout">Sign out</button>
-  </div>`;
+function renderLogin(error) {
+  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><h1 style="font-size:25px;margin:27px 0 6px">Welcome back</h1><p class="muted" style="margin:0 0 20px">Sign in with your administrator account to manage the store.</p>' +
+    (error ? '<div class="error" role="alert">' + esc(error) + '</div>' : '') +
+    '<form id="login-form"><div class="field"><label for="login-email">EMAIL</label><input id="login-email" type="email" autocomplete="username" required placeholder="you@example.com"></div><div class="field"><label for="login-password">PASSWORD</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Enter your password"></div><button id="login-submit" class="btn btn-primary btn-block" type="submit" style="margin-top:10px">Sign in to dashboard</button></form><p class="muted small" style="margin:20px 0 0"><a href="./index.html">← Return to storefront</a></p></section></main>';
 }
-
-export async function start() {
+function renderDenied() {
+  $("root").innerHTML = '<main class="auth-wrap"><section class="auth-card"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><h1 style="font-size:24px">Administrator access required</h1><p class="muted">This account is not marked as an administrator. Sign out and use the owner account.</p><button class="btn btn-primary btn-block" data-action="logout">Sign out</button><p><a href="./index.html">Return to storefront</a></p></section></main>';
+}
+function renderShell() {
+  const email = state.auth && state.auth.user && state.auth.user.email ? state.auth.user.email : "Administrator";
+  const nav = [{id:"overview",label:"Overview"},{id:"products",label:"Products"},{id:"orders",label:"Orders"}];
+  $("root").innerHTML = '<div class="admin-layout"><header class="shop-header"><div class="w shop-header-inner"><a class="store-brand" href="./index.html"><span>Bolt<b>House</b> 🔩</span><span class="admin-label">ADMIN</span></a><div class="top-actions"><span class="admin-email">' + esc(email) + '</span><a class="cartbtn" href="./index.html">View store ↗</a><button class="signout-btn" data-action="logout">Sign out</button></div></div></header><main class="w main"><nav class="admin-nav"><div class="nav">' +
+    nav.map(item => '<button type="button" data-route="' + item.id + '" class="' + (item.id === state.route ? "active" : "") + '">' + item.label + '</button>').join("") +
+    '</div><a class="setup-link" href="./admin-policies.sql" target="_blank" rel="noopener">Database setup ↗</a></nav><div id="page" class="page"><div class="loading-screen">Loading dashboard…</div></div></main><footer class="admin-footer"><div class="w">© BoltHouse · Store management</div></footer></div>';
+}
+function setPageTitle(title) {
+  const node = $("top-title");
+  if (node) node.textContent = title;
+  document.title = "BoltHouse Admin · " + title;
+  document.querySelectorAll("[data-route]").forEach(button => button.classList.toggle("active", button.dataset.route === state.route));
+}
+async function startApp(auth) {
+  state.auth = auth;
+  state.route = "overview";
+  renderShell();
+  await navigate("overview");
+}
+async function start() {
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
+    renderLogin("Supabase is not configured. Check config.js.");
+    return;
+  }
   const auth = session();
-  if (!auth) {
-    show(shell(`<p>Please sign in first.</p><button class="go" data-admin="close">Close</button>`));
+  if (!auth) { renderLogin(""); return; }
+  if (!isAdmin(auth)) { renderDenied(); return; }
+  await startApp(auth);
+}
+async function loadProductsData() {
+  state.productError = "";
+  state.materialSupported = true;
+  try {
+    let rows;
+    try {
+      rows = await fetchAll("products?select=category,type,size,length,price,in_stock,material&order=category,type,size,length,material");
+    } catch (materialError) {
+      state.materialSupported = false;
+      rows = await fetchAll("products?select=category,type,size,length,price,in_stock&order=category,type,size,length");
+      rows = rows.map(product => ({...product,material:"steel"}));
+    }
+    state.products = rows.map(product => ({...product,material:product.material === "stainless_steel" ? "stainless_steel" : "steel"}));
+    return true;
+  } catch (error) {
+    state.productError = error && error.message ? error.message : "Could not load products.";
+    return false;
+  }
+}
+function normalItems(order) {
+  if (Array.isArray(order.items)) return order.items;
+  if (typeof order.items === "string") {
+    try { const parsed = JSON.parse(order.items); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+  }
+  return [];
+}
+async function loadOrdersData() {
+  state.ordersError = "";
+  state.ordersStatusSupported = true;
+  try {
+    state.orders = await fetchAll("orders?select=ref,name,phone,address,items,total,created_at,status&order=created_at.desc");
+    return true;
+  } catch (firstError) {
+    try {
+      state.orders = await fetchAll("orders?select=ref,name,phone,address,items,total,created_at&order=created_at.desc");
+      state.ordersStatusSupported = false;
+      return true;
+    } catch (error) {
+      state.ordersError = error && error.message ? error.message : (firstError && firstError.message ? firstError.message : "Could not load orders.");
+      return false;
+    }
+  }
+}
+async function navigate(route) {
+  if (!["overview","products","orders"].includes(route)) route = "overview";
+  state.route = route;
+  setPageTitle(route === "overview" ? "Overview" : route === "settings" ? "Store settings" : pretty(route));
+  const page = $("page");
+  if (!page) return;
+  page.innerHTML = '<div class="panel-empty">Loading ' + esc(route) + '…</div>';
+  if (route === "overview") {
+    await Promise.all([loadProductsData(),loadOrdersData()]);
+    renderOverview();
+  } else if (route === "products") {
+    await loadProductsData();
+    renderProducts();
+  } else if (route === "orders") {
+    await loadOrdersData();
+    renderOrders();
+  } else {
+    await loadSettingsData();
+    renderSettings();
+  }
+}
+async function loadSettingsData() {
+  state.settingsError = "";
+  try {
+    const rows = await api("site_settings?select=id,store_name,hero_title,hero_description,perk_one,perk_two,perk_three,whatsapp,updated_at&id=eq.true",{method:"GET"});
+    if (!Array.isArray(rows) || !rows.length) throw new Error("No store settings were found. Run the admin database setup SQL to create the settings record.");
+    state.settings = rows[0];
+    return true;
+  } catch (error) {
+    state.settingsError = error && error.message ? error.message : "Could not load store settings.";
+    state.settings = null;
+    return false;
+  }
+}
+function renderSettings() {
+  const page = $("page");
+  if (!state.settings) {
+    page.innerHTML = pageHeading("Store settings","Manage the information customers see on the storefront.") +
+      errorBox(state.settingsError) +
+      '<section class="panel"><div class="panel-body"><h2 style="margin-top:0">Store settings are not configured</h2><p class="muted">Run the one-time database setup to create secure storage for these settings.</p><a class="btn btn-primary" href="./admin-policies.sql" target="_blank" rel="noopener">Open admin database setup ↗</a></div></section>';
     return;
   }
-  if (!isAdmin(auth)) {
-    show(shell(`<p role="alert">This account is not marked as an administrator. Sign in with your admin account.</p>
-      <button class="go" data-admin="logout">Sign out</button>`));
-    return;
-  }
-  currentTab = "products";
-  show(shell(`<p class="meta">Signed in as ${esc(auth.user?.email || "admin")}</p>
-    ${tabs()}
-    <div id="admin-error" role="alert" style="color:var(--acc);overflow-wrap:anywhere"></div>
-    <div id="admin-content"><p class="empty">Loading products…</p></div>`));
-  await loadProducts();
+  const s = state.settings;
+  page.innerHTML = pageHeading("Store settings","Edit the storefront branding, homepage message, customer benefits and WhatsApp contact.",'<button class="btn btn-soft" data-action="refresh">↻ Reload</button>') +
+    errorBox(state.settingsError) +
+    '<section class="panel"><div class="panel-head"><h2>Homepage and contact details</h2><span class="small muted">Saved to the shared database</span></div><div class="panel-body"><form id="settings-form"><div id="settings-form-error"></div><div class="form-grid">' +
+    '<div class="field wide"><label for="settings-name">STORE NAME</label><input id="settings-name" name="store_name" maxlength="80" required value="' + esc(s.store_name) + '"></div>' +
+    '<div class="field wide"><label for="settings-title">HOMEPAGE HEADLINE</label><input id="settings-title" name="hero_title" maxlength="160" required value="' + esc(s.hero_title) + '"></div>' +
+    '<div class="field wide"><label for="settings-description">HOMEPAGE DESCRIPTION</label><textarea id="settings-description" name="hero_description" maxlength="300" required>' + esc(s.hero_description) + '</textarea></div>' +
+    '<div class="field"><label for="settings-perk-one">BENEFIT LABEL 1</label><input id="settings-perk-one" name="perk_one" maxlength="60" required value="' + esc(s.perk_one) + '"></div>' +
+    '<div class="field"><label for="settings-perk-two">BENEFIT LABEL 2</label><input id="settings-perk-two" name="perk_two" maxlength="60" required value="' + esc(s.perk_two) + '"></div>' +
+    '<div class="field wide"><label for="settings-perk-three">BENEFIT LABEL 3</label><input id="settings-perk-three" name="perk_three" maxlength="60" required value="' + esc(s.perk_three) + '"></div>' +
+    '<div class="field wide"><label for="settings-whatsapp">WHATSAPP PHONE NUMBER</label><input id="settings-whatsapp" name="whatsapp" inputmode="tel" maxlength="24" required value="' + esc(s.whatsapp) + '" placeholder="201552155041"><div class="small muted">Use the international country code and digits only, without a plus sign.</div></div>' +
+    '</div><div class="notice">The storefront reads these settings from the database. Customers may need to refresh the page to see saved changes.</div><button id="settings-save-button" class="btn btn-primary" type="submit">Save storefront settings</button></form></div></section>';
 }
-
-async function loadProducts() {
-  currentTab = "products";
-  const root = get("admin-content");
-  const err = get("admin-error");
-  if (!root || !err) return;
-  root.innerHTML = `<p class="empty">Loading products…</p>`;
-  err.textContent = "";
-  try {
-    const rows = await api("products?select=category,type,size,length,price,in_stock&order=category,type,size,length", { method: "GET" });
-    if (!Array.isArray(rows)) throw new Error("Unexpected products response.");
-    productRows = rows;
-    root.innerHTML = `<button class="go" data-admin="show-add-product" style="margin:8px 0">+ Add product</button>
-      <div id="add-product-form" hidden style="border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0">
-        <h3 style="margin:0 0 8px">Add a product</h3>
-        <div class="f">
-          <label for="new-category">Category</label>
-          <select id="new-category"><option value="bolt">Bolts</option><option value="screw">Screws</option><option value="nut">Nuts</option><option value="washer">Washers</option></select>
-          <label for="new-type">Product type</label>
-          <input id="new-type" maxlength="80" placeholder="e.g. Hex Bolt" required>
-          <label for="new-size">Metric size (number only)</label>
-          <input id="new-size" type="number" min="1" max="1000" step="1" placeholder="e.g. 8" required>
-          <label for="new-length">Length in mm (leave empty for nuts/washers)</label>
-          <input id="new-length" type="number" min="1" max="10000" step="1" placeholder="e.g. 30">
-          <label for="new-price">Price per piece (EGP)</label>
-          <input id="new-price" type="number" min="0" max="100000000" step="0.01" placeholder="e.g. 5.00" required>
-          <label style="display:flex;align-items:center;gap:8px"><input id="new-stock" type="checkbox" checked> In stock</label>
-          <button class="go" data-admin="create-product">Save new product</button>
-        </div>
-      </div>
-      <p class="meta">Edit a price or availability, then press Save on that product.</p>` + (rows.length ? rows.map((p, i) => {
-      const label = `${p.type || p.category} M${p.size}${p.length == null ? "" : " × " + p.length + " mm"}`;
-      return `<section class="it" style="display:block;margin:8px 0">
-        <b>${esc(label)}</b>
-        <div class="meta">${esc(p.category)} · ${p.length == null ? "No length" : esc(p.length + " mm")}</div>
-        <div class="fr" style="align-items:center;flex-wrap:wrap;margin-top:8px">
-          <label for="price-${i}" class="meta">Price (EGP)</label>
-          <input id="price-${i}" data-product-price="${i}" type="number" min="0" max="100000000" step="0.01" value="${esc(p.price)}" style="width:125px" aria-label="Price in EGP for ${esc(label)}">
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input data-product-stock="${i}" type="checkbox" ${p.in_stock ? "checked" : ""}> In stock</label>
-          <button class="chip" data-admin="save-product" data-index="${i}">Save</button>
-        </div>
-      </section>`;
-    }).join("") : `<p class="empty">No products found yet. Use “Add product” above to create your first item.</p>`);
-  } catch (error) {
-    root.innerHTML = `<p class="empty">Products could not be loaded. Check that the products table exists and allows admins to read it.</p>`;
-    err.textContent = error?.message || "Unable to load products.";
-  }
-}
-
-async function saveProduct(button, index) {
-  const p = productRows[index];
-  const err = get("admin-error");
-  if (!p || !err) return;
-  const priceInput = get(`price-${index}`);
-  const stockInput = document.querySelector(`[data-product-stock="${index}"]`);
-  const price = Number(priceInput?.value);
-  if (!Number.isFinite(price) || price < 0 || price > 100000000) {
-    err.textContent = "Enter a valid non-negative price.";
-    priceInput?.focus();
-    return;
-  }
-  const filter = [
-    `category=eq.${encodeURIComponent(p.category)}`,
-    `type=eq.${encodeURIComponent(p.type)}`,
-    `size=eq.${encodeURIComponent(p.size)}`,
-    p.length == null ? "length=is.null" : `length=eq.${encodeURIComponent(p.length)}`
-  ].join("&");
-  button.disabled = true;
-  button.textContent = "Saving…";
-  err.textContent = "";
-  try {
-    await api(`products?${filter}`, {
-      method: "PATCH",
-      body: { price, in_stock: Boolean(stockInput?.checked) },
-      prefer: "return=minimal"
-    });
-    p.price = price;
-    p.in_stock = Boolean(stockInput?.checked);
-    button.textContent = "Saved ✓";
-    if (window.BH?.reload) await window.BH.reload();
-  } catch (error) {
-    err.textContent = `Could not save product: ${error?.message || "Unknown error"}. If this is a permission error, apply the admin products policy in Supabase.`;
-    button.textContent = "Retry";
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function createProduct(button) {
-  const err = get("admin-error");
-  const root = get("admin-content");
-  const category = get("new-category")?.value;
-  const type = get("new-type")?.value.trim();
-  const size = Number(get("new-size")?.value);
-  const lengthRaw = get("new-length")?.value.trim();
-  const price = Number(get("new-price")?.value);
-  const in_stock = Boolean(get("new-stock")?.checked);
-  const length = lengthRaw === "" ? null : Number(lengthRaw);
-  if (!["bolt", "screw", "nut", "washer"].includes(category)) {
-    err.textContent = "Choose a valid category."; return;
-  }
-  if (!type || type.length > 80) { err.textContent = "Enter the product type."; get("new-type")?.focus(); return; }
-  if (!Number.isSafeInteger(size) || size < 1 || size > 1000) { err.textContent = "Enter a valid metric size, for example 8."; get("new-size")?.focus(); return; }
-  if (length !== null && (!Number.isSafeInteger(length) || length < 1 || length > 10000)) { err.textContent = "Length must be a positive whole number in millimetres, or leave it empty."; get("new-length")?.focus(); return; }
-  if (!Number.isFinite(price) || price < 0 || price > 100000000) { err.textContent = "Enter a valid price in EGP."; get("new-price")?.focus(); return; }
-  button.disabled = true;
-  button.textContent = "Adding…";
-  err.textContent = "";
-  try {
-    await api("products", {
-      method: "POST",
-      body: { category, type, size, length, price, in_stock },
-      prefer: "return=minimal"
-    });
-    await loadProducts();
-    const e = get("admin-error");
-    if (e) e.textContent = "Product added successfully.";
-  } catch (error) {
-    err.textContent = `Could not add product: ${error?.message || "Unknown error"}. If you see 401/403, the admin INSERT policy is missing in Supabase.`;
-    button.disabled = false;
-    button.textContent = "Retry adding product";
-  }
-}
-
-async function loadOrders() {
-  currentTab = "orders";
-  const root = get("admin-content");
-  const err = get("admin-error");
-  if (!root || !err) return;
-  root.innerHTML = `<p class="empty">Loading orders…</p>`;
-  err.textContent = "";
-  try {
-    const orders = await api("orders?select=ref,name,phone,address,items,total,created_at&order=created_at.desc", { method: "GET" });
-    if (!Array.isArray(orders)) throw new Error("Unexpected orders response.");
-    if (!orders.length) {
-      root.innerHTML = `<p class="empty">No orders found.</p>`;
+async function saveSettingsForm(form) {
+  const button = $("settings-save-button");
+  const errorRoot = $("settings-form-error");
+  const fd = new FormData(form);
+  const settings = {
+    store_name:String(fd.get("store_name") || "").trim(),
+    hero_title:String(fd.get("hero_title") || "").trim(),
+    hero_description:String(fd.get("hero_description") || "").trim(),
+    perk_one:String(fd.get("perk_one") || "").trim(),
+    perk_two:String(fd.get("perk_two") || "").trim(),
+    perk_three:String(fd.get("perk_three") || "").trim(),
+    whatsapp:String(fd.get("whatsapp") || "").replace(/\D/g,"")
+  };
+  const bounds = [["store_name",80],["hero_title",160],["hero_description",300],["perk_one",60],["perk_two",60],["perk_three",60]];
+  for (const item of bounds) {
+    if (!settings[item[0]] || settings[item[0]].length > item[1]) {
+      errorRoot.innerHTML = '<div class="error">Check the ' + esc(item[0].replace(/_/g," ")) + ' field. It cannot be empty or too long.</div>';
+      const input = form.elements.namedItem(item[0]);
+      if (input) input.focus();
       return;
     }
-    root.innerHTML = orders.map(order => {
-      const lines = Array.isArray(order.items) ? order.items.map(item =>
-        `<li>${esc(item.qty)} × ${esc(item.name)}${Number.isFinite(Number(item.price)) ? ` — ${money(Number(item.qty) * Number(item.price))}` : ""}</li>`
-      ).join("") : `<li>Items are stored in an unsupported format.</li>`;
-      const date = order.created_at ? new Date(order.created_at).toLocaleString() : "Date unavailable";
-      return `<section class="it" style="display:block;margin:8px 0">
-        <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><b>${esc(order.ref || "Order")}</b><b>${money(order.total)}</b></div>
-        <div class="meta">${esc(date)}</div>
-        <p><b>${esc(order.name)}</b><br>${esc(order.phone)}<br>${esc(order.address)}</p>
-        <ul>${lines}</ul>
-      </section>`;
-    }).join("");
+  }
+  if (settings.whatsapp.length < 8 || settings.whatsapp.length > 20) {
+    errorRoot.innerHTML = '<div class="error">Enter a valid WhatsApp number with its country code.</div>';
+    $("settings-whatsapp").focus();
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Saving…";
+  errorRoot.innerHTML = "";
+  try {
+    const rows = await api("site_settings?id=eq.true",{method:"PATCH",body:{...settings,updated_at:new Date().toISOString()},prefer:"return=representation"});
+    if (!Array.isArray(rows) || !rows.length) throw new Error("No settings row was updated. Run the admin database setup and check permissions.");
+    state.settings = rows[0];
+    renderSettings();
+    setToast("Storefront settings saved.");
   } catch (error) {
-    root.innerHTML = `<p class="empty">Orders could not be loaded. Check the orders table and its RLS policies.</p>`;
-    err.textContent = error?.message || "Unable to load orders.";
+    errorRoot.innerHTML = '<div class="error">Could not save settings: ' + esc(error && error.message ? error.message : "Unknown error") + '<br><span class="small">If this is a permission error, run the linked admin database setup SQL once in Supabase.</span></div>';
+    button.disabled = false;
+    button.textContent = "Retry save";
   }
 }
-
-let listenerAdded = false;
-function attachListener() {
-  if (listenerAdded) return;
-  listenerAdded = true;
-  document.addEventListener("click", async event => {
-    const button = event.target.closest("button[data-admin]");
-    if (!button) return;
-    const action = button.dataset.admin;
-    if (action === "close") {
-      get("ov")?.classList.remove("open");
-    } else if (action === "products") {
-      await loadProducts();
-    } else if (action === "orders") {
-      await loadOrders();
-    } else if (action === "refresh") {
-      button.disabled = true;
-      try { currentTab === "products" ? await loadProducts() : await loadOrders(); }
-      finally { button.disabled = false; }
-    } else if (action === "show-add-product") {
-      const form = get("add-product-form");
-      if (form) form.hidden = !form.hidden;
-    } else if (action === "create-product") {
-      await createProduct(button);
-    } else if (action === "save-product") {
-      await saveProduct(button, Number(button.dataset.index));
-    } else if (action === "logout") {
-      button.disabled = true;
-      try { await logout(); }
-      catch { /* Local session is cleared even if remote logout fails. */ }
-      get("ov")?.classList.remove("open");
-    }
+function pageHeading(title, subtitle, action) {
+  return '<div class="page-heading"><div><h1>' + title + '</h1><p>' + subtitle + '</p></div>' + (action || '') + '</div>';
+}
+function errorBox(message) {
+  return message ? '<div class="error" role="alert">' + esc(message) + '</div>' : '';
+}
+function emptyState(symbol, title, subtitle) {
+  return '<div class="empty-state"><div class="empty-symbol">' + symbol + '</div><strong>' + title + '</strong><div class="small" style="margin-top:5px">' + subtitle + '</div></div>';
+}
+function recentOrdersHtml(rows) {
+  if (!rows.length) return emptyState("▤","No orders yet","New customer orders will appear here.");
+  return '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Order value</th><th>Date</th><th>Status</th></tr></thead><tbody>' + rows.slice(0,5).map(order => {
+    const value = order.status || "new";
+    const statusBadge = state.ordersStatusSupported ? '<span class="badge ' + statusClass(value) + '">' + esc(statusLabel(value)) + '</span>' : '<span class="badge status-cancelled">Status setup required</span>';
+    return '<tr><td><strong>' + esc(order.ref || "Order") + '</strong></td><td>' + esc(order.name || "—") + '</td><td><strong>' + money(order.total) + '</strong></td><td>' + esc(dateText(order.created_at)) + '</td><td>' + statusBadge + '</td></tr>';
+  }).join("") + '</tbody></table></div>';
+}
+function renderOverview() {
+  const page = $("page");
+  const products = state.products;
+  const orders = state.orders;
+  const stockCount = products.filter(p => p.in_stock).length;
+  const outCount = products.length - stockCount;
+  const orderValue = orders.reduce((sum, order) => sum + Number(order.total || 0),0);
+  page.innerHTML = pageHeading("Store overview","A quick look at your products, stock, and customer orders.",'<button class="btn btn-soft" data-action="refresh">↻ Refresh</button>') +
+    errorBox(state.productError ? "Products: " + state.productError : "") + errorBox(state.ordersError ? "Orders: " + state.ordersError : "") +
+    '<div class="stats"><section class="stat"><div class="stat-top"><span>Total products</span><span class="stat-icon">◇</span></div><div class="stat-value">' + (state.productError ? "—" : products.length) + '</div><div class="stat-note">Catalogue entries</div></section>' +
+    '<section class="stat"><div class="stat-top"><span>In stock</span><span class="stat-icon">✓</span></div><div class="stat-value">' + (state.productError ? "—" : stockCount) + '</div><div class="stat-note">' + (state.productError ? "Stock unavailable" : outCount + " out of stock") + '</div></section>' +
+    '<section class="stat"><div class="stat-top"><span>Total orders</span><span class="stat-icon">▤</span></div><div class="stat-value">' + (state.ordersError ? "—" : orders.length) + '</div><div class="stat-note">Orders recorded in the database</div></section>' +
+    '<section class="stat"><div class="stat-top"><span>Order value</span><span class="stat-icon">EGP</span></div><div class="stat-value" style="font-size:clamp(20px,2.5vw,28px)">' + (state.ordersError ? "—" : money(orderValue)) + '</div><div class="stat-note">Combined total of recorded orders</div></section></div>' +
+    '<div class="quick-grid"><button class="quick-card" data-action="add-product"><span class="quick-icon">＋</span><span><span class="quick-title">Add a product</span><span class="quick-desc" style="display:block">Create a new catalogue item</span></span></button><button class="quick-card" data-route="orders"><span class="quick-icon">▤</span><span><span class="quick-title">Manage orders</span><span class="quick-desc" style="display:block">Review customer information and order status</span></span></button></div>' +
+    '<section class="panel"><div class="panel-head"><h2>Recent orders</h2><button class="btn btn-soft btn-small" data-route="orders">View all orders →</button></div>' + (state.ordersError ? '<div class="panel-empty">Orders could not be loaded.</div>' : recentOrdersHtml(orders)) + '</section>' +
+    '<p class="small muted" style="margin-top:16px">Manage catalogue details and orders here. Storefront products update from the shared database.</p>';
+}
+function productKey(product) {
+  const base = "category=eq." + encodeURIComponent(product.category) + "&type=eq." + encodeURIComponent(product.type) + "&size=eq." + encodeURIComponent(product.size) + "&length=" + (product.length == null ? "is.null" : "eq." + encodeURIComponent(product.length));
+  return state.materialSupported ? base + "&material=eq." + encodeURIComponent(product.material || "steel") : base;
+}
+function sameProductKey(a,b) {
+  return a.category === b.category && a.type.trim().toLowerCase() === b.type.trim().toLowerCase() && Number(a.size) === Number(b.size) && (a.length == null ? null : Number(a.length)) === (b.length == null ? null : Number(b.length)) && (!state.materialSupported || (a.material || "steel") === (b.material || "steel"));
+}
+function categoryLabel(value) {
+  return ({bolt:"Bolts",screw:"Screws",nut:"Nuts",washer:"Washers"})[value] || pretty(value);
+}
+function filteredProducts() {
+  const search = state.productSearch.trim().toLowerCase();
+  return state.products.map((product,index) => ({product,index})).filter(item => {
+    const p = item.product;
+    const matchesCategory = state.productCategory === "all" || p.category === state.productCategory;
+    const matchesMaterial = state.productMaterial === "all" || (p.material || "steel") === state.productMaterial;
+    const materialText = (p.material || "steel") === "stainless_steel" ? "stainless steel" : "steel";
+    const text = [p.type,p.category,p.size,p.length,p.price,materialText].join(" ").toLowerCase();
+    return matchesCategory && matchesMaterial && (!search || text.includes(search));
   });
 }
-
-attachListener();
+function renderProducts() {
+  const page = $("page");
+  const categories = ["all","bolt","screw","nut","washer"];
+  const materialOptions = '<option value="all"' + (state.productMaterial === "all" ? " selected" : "") + '>All materials</option><option value="steel"' + (state.productMaterial === "steel" ? " selected" : "") + '>Steel</option><option value="stainless_steel"' + (state.productMaterial === "stainless_steel" ? " selected" : "") + '>Stainless steel</option>';
+  page.innerHTML = pageHeading("Products","Add, edit, price, stock, or remove products in your catalogue.",'<button class="btn btn-primary" data-action="add-product">＋ Add product</button>') +
+    errorBox(state.productError) +
+    (!state.materialSupported ? '<div class="notice">The material column is not installed yet. Run the <a href="./admin-policies.sql" target="_blank" rel="noopener">database setup SQL</a> to activate Steel and Stainless steel controls. Existing products are temporarily treated as Steel.</div>' : '') +
+    '<section class="panel"><div class="panel-head"><h2>Product catalogue</h2><button class="btn btn-soft btn-small" data-action="refresh">↻ Refresh</button></div><div class="panel-body"><div class="toolbar"><input class="search" id="product-search" value="' + esc(state.productSearch) + '" placeholder="Search name, material, size…" aria-label="Search products"><select class="category-filter" id="product-category" aria-label="Filter by category">' + categories.map(c => '<option value="' + c + '"' + (state.productCategory === c ? " selected" : "") + '>' + (c === "all" ? "All categories" : categoryLabel(c)) + '</option>').join("") + '</select><select class="category-filter" id="product-material" aria-label="Filter by material"' + (state.materialSupported ? "" : " disabled") + '>' + materialOptions + '</select><span class="results-count" id="product-count"></span></div><div id="product-results"></div></div></section>' +
+    '<div class="notice">Changes apply to the customer catalogue. Out-of-stock items remain visible here but are hidden from shoppers. Product material is stored in the database and used by the storefront filter.</div>';
+  renderProductResults();
+}
+function renderProductResults() {
+  const target = $("product-results");
+  const count = $("product-count");
+  if (!target) return;
+  const rows = filteredProducts();
+  if (count) count.textContent = rows.length + " shown";
+  if (state.productError) {
+    target.innerHTML = emptyState("!","Catalogue unavailable","Check the database connection and administrator read permissions.");
+    return;
+  }
+  if (!rows.length) {
+    target.innerHTML = emptyState("◇",state.products.length ? "No matching products" : "No products yet",state.products.length ? "Try another search or category." : "Use Add product to create the first catalogue item.");
+    return;
+  }
+  target.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Material</th><th>Size</th><th>Length</th><th>Price / piece</th><th>Availability</th><th>Actions</th></tr></thead><tbody>' + rows.map(({product:p,index}) => {
+    const label = (p.type || p.category) + " M" + p.size;
+    const materialLabel = (p.material || "steel") === "stainless_steel" ? "Stainless steel" : "Steel";
+    return '<tr><td><div class="product-name">' + esc(label) + '</div><div class="product-sub">' + (p.length == null ? "No length" : esc(p.length + " mm")) + '</div></td><td>' + esc(categoryLabel(p.category)) + '</td><td><span class="material-label">' + esc(materialLabel) + '</span></td><td>M' + esc(p.size) + '</td><td>' + (p.length == null ? "—" : esc(p.length + " mm")) + '</td><td><strong>' + money(p.price) + '</strong></td><td><span class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></td><td><div class="actions"><button class="btn btn-soft btn-small" data-action="edit-product" data-index="' + index + '">Edit</button><button class="btn btn-danger btn-small" data-action="delete-product" data-index="' + index + '">Delete</button></div></td></tr>';
+  }).join("") + '</tbody></table></div>';
+}
+function productTypeSuggestions(category) {
+  const common = {
+    bolt:["Hex Bolt","Socket Head Bolt","Carriage Bolt","Eye Bolt","Anchor Bolt"],
+    screw:["Pan Head Screw","Countersunk Screw","Wood Screw","Self-Tapping Screw","Machine Screw"],
+    nut:["Hex Nut","Lock Nut","Flange Nut","Wing Nut"],
+    washer:["Flat Washer","Spring Washer","Fender Washer","Lock Washer"]
+  };
+  const existing = state.products.filter(p => p.category === category).map(p => p.type).filter(Boolean);
+  return [...new Set([...(common[category] || []),...existing])].sort((a,b) => a.localeCompare(b));
+}
+function updateProductTypeOptions() {
+  const list = $("product-type-options");
+  const category = $("product-category-field")?.value || "bolt";
+  if (!list) return;
+  list.replaceChildren();
+  productTypeSuggestions(category).forEach(type => {
+    const option = document.createElement("option");
+    option.value = type;
+    list.appendChild(option);
+  });
+}
+function syncProductForm() {
+  const category = $("product-category-field")?.value || "bolt";
+  const usesLength = category === "bolt" || category === "screw";
+  const lengthWrap = $("product-length-wrap");
+  const lengthInput = $("product-length-field");
+  if (lengthWrap) lengthWrap.hidden = !usesLength;
+  if (!usesLength && lengthInput) lengthInput.value = "";
+  updateProductTypeOptions();
+  updateProductPreview();
+}
+function updateProductPreview() {
+  const type = $("product-type-field")?.value.trim() || "Product type";
+  const category = $("product-category-field")?.value || "bolt";
+  const size = $("product-size-field")?.value;
+  const length = $("product-length-field")?.value;
+  const priceRaw = $("product-price-field")?.value;
+  const price = priceRaw === "" ? null : Number(priceRaw);
+  const inStock = Boolean($("product-stock-field")?.checked);
+  const usesLength = category === "bolt" || category === "screw";
+  const label = type + (size ? " M" + size : " · size not set") + (usesLength && length ? " × " + length + " mm" : "");
+  const name = $("preview-product-name");
+  const meta = $("preview-product-meta");
+  const priceNode = $("preview-product-price");
+  const badge = $("preview-product-stock");
+  if (name) name.textContent = label;
+  const material = $("product-material-field")?.value || "steel";
+  if (meta) meta.textContent = categoryLabel(category) + " · " + (material === "stainless_steel" ? "Stainless steel" : "Steel") + (size ? " · Metric M" + size : "") + (usesLength && length ? " · " + length + " mm long" : "");
+  if (priceNode) priceNode.textContent = price !== null && Number.isFinite(price) && price >= 0 ? money(price) : "Price not set";
+  if (badge) {
+    badge.textContent = inStock ? "In stock" : "Out of stock";
+    badge.className = "badge " + (inStock ? "stock" : "out");
+  }
+}
+function openProductForm(product) {
+  state.editing = product || null;
+  const p = product || {category:"bolt",type:"",material:"steel",size:"",length:"",price:"",in_stock:true};
+  $("modal-root").innerHTML = '<section class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><form id="product-form">' +
+    '<div class="modal-head"><div><div class="modal-kicker">BOLTHOUSE CATALOGUE</div><h2 id="product-modal-title">' + (product ? "Edit product" : "Add a product") + '</h2><p class="modal-subtitle">' + (product ? "Update the details customers see in your shop." : "Add an item once. It will appear in your shop when it is in stock.") + '</p></div><button type="button" class="modal-close" data-action="close-modal" aria-label="Close">×</button></div>' +
+    '<div class="modal-body"><div id="product-form-error"></div>' +
+    '<section class="form-section"><div class="form-section-head"><span class="form-step">01</span><div><h3>Product details</h3><p>Choose a category and identify the exact fastener.</p></div></div><div class="form-grid">' +
+    '<div class="field"><label for="product-category-field">Category</label><select id="product-category-field" name="category" required><option value="bolt"' + (p.category === "bolt" ? " selected" : "") + '>Bolts</option><option value="screw"' + (p.category === "screw" ? " selected" : "") + '>Screws</option><option value="nut"' + (p.category === "nut" ? " selected" : "") + '>Nuts</option><option value="washer"' + (p.category === "washer" ? " selected" : "") + '>Washers</option></select><span class="field-help">Choose the product group.</span></div>' +
+    '<div class="field"><label for="product-type-field">Product type</label><input id="product-type-field" name="type" list="product-type-options" maxlength="80" required value="' + esc(p.type) + '" placeholder="e.g. Hex Bolt" autocomplete="off"><datalist id="product-type-options"></datalist><span class="field-help">Select a suggestion or type your own.</span></div>' +
+    '<div class="field"><label for="product-material-field">Material</label><select id="product-material-field" name="material" required' + (state.materialSupported ? '' : ' disabled') + '><option value="steel"' + ((p.material || "steel") === "steel" ? " selected" : "") + '>Steel</option><option value="stainless_steel"' + (p.material === "stainless_steel" ? " selected" : "") + '>Stainless steel</option></select><span class="field-help">' + (state.materialSupported ? 'Choose standard steel or corrosion-resistant stainless steel.' : 'Run the database setup SQL to enable material selection.') + '</span></div>' +
+    '<div class="field"><label for="product-size-field">Metric size</label><div class="field-inline"><span class="field-prefix">M</span><input id="product-size-field" name="size" type="number" min="1" max="1000" step="1" required value="' + esc(p.size) + '" placeholder="8"></div><span class="field-help">For example, enter 8 for M8.</span></div>' +
+    '<div class="field" id="product-length-wrap"><label for="product-length-field">Length</label><div class="field-inline"><input id="product-length-field" name="length" type="number" min="1" max="10000" step="1" value="' + (p.length == null ? "" : esc(p.length)) + '" placeholder="30"><span class="field-unit">mm</span></div><span class="field-help">Length in millimetres. Not needed for nuts or washers.</span></div>' +
+    '</div></section>' +
+    '<section class="form-section"><div class="form-section-head"><span class="form-step">02</span><div><h3>Price & availability</h3><p>Set the selling price and whether customers can order it.</p></div></div>' +
+    '<div class="price-stock-row"><div class="field price-field"><label for="product-price-field">Price per piece</label><div class="field-inline"><input id="product-price-field" name="price" type="number" min="0" max="100000000" step="0.01" required value="' + esc(p.price) + '" placeholder="0.00"><span class="field-unit">EGP</span></div><span class="field-help">Price for one item.</span></div>' +
+    '<div class="availability-card"><label class="checkbox-field"><input id="product-stock-field" name="in_stock" type="checkbox"' + (p.in_stock ? " checked" : "") + '> Available for customers</label><p class="availability-help">Turn off to hide it from the storefront without deleting it.</p></div></div></section>' +
+    '<section class="product-preview" aria-live="polite"><div class="preview-heading"><span>STOREFRONT PREVIEW</span><span id="preview-product-stock" class="badge ' + (p.in_stock ? "stock" : "out") + '">' + (p.in_stock ? "In stock" : "Out of stock") + '</span></div><div class="preview-item"><div class="preview-icon">🔩</div><div class="preview-info"><div id="preview-product-name" class="preview-name"></div><div id="preview-product-meta" class="preview-meta"></div></div><div id="preview-product-price" class="preview-price"></div></div></section>' +
+    '</div><div class="modal-footer"><button type="button" class="btn btn-soft" data-action="close-modal">Cancel</button><button id="product-save-button" type="submit" class="btn btn-primary">' + (product ? "Save changes" : "＋ Create product") + '</button></div></form></section>';
+  $("modal-root").classList.add("open");
+  syncProductForm();
+  $("product-type-field").focus();
+}
+function closeModal() {
+  $("modal-root").classList.remove("open");
+  $("modal-root").innerHTML = "";
+  state.editing = null;
+}
+async function submitProductForm(form) {
+  const errorRoot = $("product-form-error");
+  const button = $("product-save-button");
+  const fd = new FormData(form);
+  const category = String(fd.get("category") || "");
+  const type = String(fd.get("type") || "").trim();
+  const size = Number(fd.get("size"));
+  const lengthRaw = String(fd.get("length") || "").trim();
+  const price = Number(fd.get("price"));
+  const data = {category,type,size,length:((category === "bolt" || category === "screw") && lengthRaw !== "") ? Number(lengthRaw) : null,price,in_stock:fd.get("in_stock") === "on"};
+  if (state.materialSupported) data.material = String(fd.get("material") || "steel");
+  const old = state.editing;
+  if (state.materialSupported && !["steel","stainless_steel"].includes(data.material)) { errorRoot.innerHTML = '<div class="error">Choose Steel or Stainless steel.</div>'; return; }
+  if (!["bolt","screw","nut","washer"].includes(category)) { errorRoot.innerHTML = '<div class="error">Choose a valid category.</div>'; return; }
+  if (!type || type.length > 80) { errorRoot.innerHTML = '<div class="error">Enter a product type (up to 80 characters).</div>'; $("product-type-field").focus(); return; }
+  if (!Number.isSafeInteger(size) || size < 1 || size > 1000) { errorRoot.innerHTML = '<div class="error">Enter a valid metric size.</div>'; $("product-size-field").focus(); return; }
+  if (data.length !== null && (!Number.isSafeInteger(data.length) || data.length < 1 || data.length > 10000)) { errorRoot.innerHTML = '<div class="error">Length must be a positive whole number of millimetres, or leave it blank.</div>'; $("product-length-field").focus(); return; }
+  if (!Number.isFinite(price) || price < 0 || price > 100000000) { errorRoot.innerHTML = '<div class="error">Enter a valid non-negative price in EGP.</div>'; $("product-price-field").focus(); return; }
+  if (state.products.some(p => p !== old && sameProductKey(p,data))) { errorRoot.innerHTML = '<div class="error">A product with this category, type, size, and length already exists.</div>'; return; }
+  button.disabled = true;
+  button.textContent = old ? "Saving…" : "Creating…";
+  errorRoot.innerHTML = "";
+  try {
+    if (old) {
+      await api("products?" + productKey(old),{method:"PATCH",body:data,prefer:"return=minimal"});
+    } else {
+      await api("products",{method:"POST",body:data,prefer:"return=minimal"});
+    }
+    closeModal();
+    await loadProductsData();
+    if (state.route === "overview") renderOverview(); else renderProducts();
+    setToast(old ? "Product changes saved." : "Product created.");
+  } catch (error) {
+    errorRoot.innerHTML = '<div class="error">Could not save product: ' + esc(error && error.message ? error.message : "Unknown error") + '<br><span class="small">If the message mentions permission or 401/403, run the linked admin database setup SQL once in Supabase.</span></div>';
+    button.disabled = false;
+    button.textContent = old ? "Retry save" : "Retry create";
+  }
+}
+async function deleteProduct(index) {
+  const p = state.products[index];
+  if (!p) return;
+  const label = (p.type || p.category) + " M" + p.size + (p.length == null ? "" : " × " + p.length + " mm");
+  if (!window.confirm("Delete " + label + " permanently? This removes it from your catalogue.")) return;
+  try {
+    await api("products?" + productKey(p),{method:"DELETE",prefer:"return=minimal"});
+    await loadProductsData();
+    renderProducts();
+    setToast("Product deleted.");
+  } catch (error) {
+    setToast("Could not delete product. Check the admin database setup SQL and try again.");
+    console.error(error);
+  }
+}
+function filteredOrders() {
+  const search = state.orderSearch.trim().toLowerCase();
+  return state.orders.filter(order => {
+    const matchStatus = !state.ordersStatusSupported || state.orderStatus === "all" || (order.status || "new") === state.orderStatus;
+    const text = [order.ref,order.name,order.phone,order.address].join(" ").toLowerCase();
+    return matchStatus && (!search || text.includes(search));
+  });
+}
+function orderStatusSelect(order) {
+  if (!state.ordersStatusSupported) return '<span class="muted small">Run <a href="./admin-policies.sql" target="_blank" rel="noopener">database setup</a> to enable status control.</span>';
+  const current = statuses.includes(order.status) ? order.status : "new";
+  return '<select class="status-select" data-order-status data-ref="' + esc(order.ref) + '" data-current="' + esc(current) + '" aria-label="Order status for ' + esc(order.ref) + '">' + statuses.map(status => '<option value="' + status + '"' + (status === current ? " selected" : "") + '>' + statusLabel(status) + '</option>').join("") + '</select>';
+}
+function renderOrders() {
+  const page = $("page");
+  page.innerHTML = pageHeading("Customer orders","Review order details, contact customers, update status, or export a report.",'<button class="btn btn-soft" data-action="export-orders">↓ Export CSV</button>') +
+    errorBox(state.ordersError) +
+    (!state.ordersStatusSupported && !state.ordersError ? '<div class="notice">Order viewing is available. To enable status tracking, run the <a href="./admin-policies.sql" target="_blank" rel="noopener">admin database setup SQL</a> once in Supabase.</div>' : '') +
+    '<section class="panel"><div class="panel-head"><h2>Orders</h2><button class="btn btn-soft btn-small" data-action="refresh">↻ Refresh</button></div><div class="panel-body"><div class="toolbar"><input class="search" id="order-search" value="' + esc(state.orderSearch) + '" placeholder="Search order, customer, phone…" aria-label="Search orders">' + (state.ordersStatusSupported ? '<select class="category-filter" id="order-status-filter" aria-label="Filter orders by status"><option value="all">All statuses</option>' + statuses.map(status => '<option value="' + status + '"' + (state.orderStatus === status ? " selected" : "") + '>' + statusLabel(status) + '</option>').join("") + '</select>' : '<select class="category-filter" disabled aria-label="Status filtering requires setup"><option>Set up statuses first</option></select>') + '<span id="order-count" class="results-count"></span></div><div id="order-results"></div></div></section>';
+  renderOrderResults();
+}
+function renderOrderResults() {
+  const target = $("order-results");
+  if (!target) return;
+  const rows = filteredOrders();
+  state.visibleOrders = rows;
+  const count = $("order-count");
+  if (count) count.textContent = rows.length + " orders";
+  if (state.ordersError) { target.innerHTML = emptyState("!","Orders unavailable","Check the orders table and administrator read permissions."); return; }
+  if (!rows.length) { target.innerHTML = emptyState("▤",state.orders.length ? "No matching orders" : "No orders yet",state.orders.length ? "Try another search or status filter." : "Customer orders will show up here."); return; }
+  target.innerHTML = '<div class="order-list">' + rows.map(order => {
+    const items = normalItems(order);
+    const itemHtml = items.length ? items.map(item => '<li>' + esc(item.qty) + ' × ' + esc(item.name || "Item") + (Number.isFinite(Number(item.price)) ? ' <span class="muted">— ' + money(Number(item.qty) * Number(item.price)) + '</span>' : '') + '</li>').join("") : '<li class="muted">No item details available.</li>';
+    const phoneDigits = String(order.phone || "").replace(/\D/g,"");
+    const phoneLink = phoneDigits ? '<a href="https://wa.me/' + esc(phoneDigits) + '" target="_blank" rel="noopener">WhatsApp customer ↗</a>' : '<span class="muted">No phone number</span>';
+    const status = order.status || "new";
+    const statusBadge = state.ordersStatusSupported ? '<span class="badge ' + statusClass(status) + '">' + esc(statusLabel(status)) + '</span>' : '<span class="badge status-cancelled">Status setup required</span>';
+    return '<article class="order-card"><div class="order-top"><div><div class="order-ref">' + esc(order.ref || "Order") + '</div><div class="order-date">' + esc(dateText(order.created_at)) + '</div></div><div><div class="order-total">' + money(order.total) + '</div>' + statusBadge + '</div></div><div class="order-main"><div class="order-customer"><strong>' + esc(order.name || "Customer") + '</strong><div>' + esc(order.phone || "No phone") + '</div><div>' + esc(order.address || "No address") + '</div><div style="margin-top:7px">' + phoneLink + '</div></div><div><div class="small muted" style="font-weight:800;margin-bottom:5px">ORDER ITEMS</div><ul class="order-items">' + itemHtml + '</ul></div></div><div class="order-actions"><span class="small muted">Status</span>' + orderStatusSelect(order) + '<button class="btn btn-soft btn-small" data-action="copy-order" data-ref="' + esc(order.ref || "") + '">Copy details</button></div></article>';
+  }).join("") + '</div>';
+}
+async function updateOrderStatus(select) {
+  const ref = select.dataset.ref;
+  const previous = select.dataset.current || "new";
+  const next = select.value;
+  if (!ref || !statuses.includes(next)) return;
+  select.disabled = true;
+  try {
+    await api("orders?ref=eq." + encodeURIComponent(ref),{method:"PATCH",body:{status:next},prefer:"return=minimal"});
+    const found = state.orders.find(order => String(order.ref) === ref);
+    if (found) found.status = next;
+    select.dataset.current = next;
+    setToast("Order " + ref + " marked " + statusLabel(next).toLowerCase() + ".");
+    renderOrderResults();
+  } catch (error) {
+    select.value = previous;
+    select.disabled = false;
+    setToast("Could not update order status. Run the admin database setup SQL if needed.");
+    console.error(error);
+  }
+}
+function exportOrders() {
+  const rows = state.visibleOrders || [];
+  const columns = ["ref","created_at","name","phone","address","total","status","items"];
+  const cell = value => {
+    let text = String(value == null ? "" : (typeof value === "object" ? JSON.stringify(value) : value));
+    // Prevent spreadsheet formula execution when customers provide fields beginning with =, +, - or @.
+    if (/^[\u0000-\u0020]*[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g,'""') + '"';
+  };
+  const csv = [columns.join(","), ...rows.map(order => columns.map(key => cell(order[key])).join(","))].join("\r\n");
+  const blob = new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "bolthouse-orders-" + new Date().toISOString().slice(0,10) + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setToast("Orders exported to CSV.");
+}
+function copyOrder(ref) {
+  const order = state.orders.find(item => String(item.ref) === ref);
+  if (!order) return;
+  const text = [ "Order: " + (order.ref || ""), "Date: " + dateText(order.created_at), "Name: " + (order.name || ""), "Phone: " + (order.phone || ""), "Address: " + (order.address || ""), "Total: " + money(order.total), "Status: " + (state.ordersStatusSupported ? statusLabel(order.status || "new") : "Status not configured"), "Items: " + normalItems(order).map(item => item.qty + " x " + item.name).join("; ") ].join("\n");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => setToast("Order details copied." )).catch(() => window.prompt("Copy order details:",text));
+  else window.prompt("Copy order details:",text);
+}
+async function refreshCurrent() {
+  const button = document.querySelector('[data-action="refresh"]');
+  if (button) { button.disabled = true; button.textContent = "Refreshing…"; }
+  await navigate(state.route);
+}
+async function signOut() {
+  try { await logout(); } catch (error) { console.error(error); }
+  state.auth = null;
+  renderLogin("");
+}
+document.addEventListener("click", async event => {
+  const routeButton = event.target.closest("[data-route]");
+  if (routeButton) { await navigate(routeButton.dataset.route); return; }
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    if (event.target === $("modal-root")) closeModal();
+    return;
+  }
+  const action = button.dataset.action;
+  if (action === "logout") { button.disabled = true; await signOut(); }
+  else if (action === "refresh") await refreshCurrent();
+  else if (action === "add-product") openProductForm(null);
+  else if (action === "edit-product") openProductForm(state.products[Number(button.dataset.index)]);
+  else if (action === "delete-product") await deleteProduct(Number(button.dataset.index));
+  else if (action === "close-modal") closeModal();
+  else if (action === "export-orders") exportOrders();
+  else if (action === "copy-order") copyOrder(button.dataset.ref || "");
+});
+document.addEventListener("submit", async event => {
+  if (event.target.id === "login-form") {
+    event.preventDefault();
+    const button = $("login-submit");
+    button.disabled = true;
+    button.textContent = "Signing in…";
+    try {
+      const auth = await login($("login-email").value.trim(),$("login-password").value);
+      if (!isAdmin(auth)) {
+        await logout();
+        renderLogin("This account does not have administrator access.");
+        return;
+      }
+      await startApp(auth);
+    } catch (error) {
+      renderLogin(error && error.message ? error.message : "Sign-in failed. Check your email and password.");
+    }
+  } else if (event.target.id === "product-form") {
+    event.preventDefault();
+    await submitProductForm(event.target);
+  } else if (event.target.id === "settings-form") {
+    event.preventDefault();
+    await saveSettingsForm(event.target);
+  }
+});
+document.addEventListener("input", event => {
+  if (event.target.id === "product-search") { state.productSearch = event.target.value; renderProductResults(); }
+  if (event.target.id === "order-search") { state.orderSearch = event.target.value; renderOrderResults(); }
+  if (["product-type-field","product-size-field","product-length-field","product-price-field"].includes(event.target.id)) updateProductPreview();
+});
+document.addEventListener("change", async event => {
+  if (event.target.id === "product-category") { state.productCategory = event.target.value; renderProductResults(); }
+  if (event.target.id === "product-material") { state.productMaterial = event.target.value; renderProductResults(); }
+  if (event.target.id === "product-category-field") syncProductForm();
+  if (event.target.id === "product-material-field") updateProductPreview();
+  if (event.target.id === "product-stock-field") updateProductPreview();
+  if (event.target.id === "order-status-filter") { state.orderStatus = event.target.value; renderOrderResults(); }
+  if (event.target.matches("[data-order-status]")) await updateOrderStatus(event.target);
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && $("modal-root").classList.contains("open")) closeModal();
+});
+start();
